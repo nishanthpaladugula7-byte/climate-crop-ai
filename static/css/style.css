@@ -118,7 +118,7 @@ html[data-theme="light"] .nav-bar { background: rgba(240, 253, 244, 0.85); }
   transition: var(--transition);
 }
 .nav-link:hover { background: var(--accent-glow); color: var(--accent); }
-.nav-actions { display: flex; align-items: center; gap: 12px; }
+.nav-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .theme-btn {
   width: 40px; height: 40px; border-radius: 10px;
   background: var(--bg-2); border: 1px solid var(--border);
@@ -562,8 +562,9 @@ html[data-theme="light"] .field-input option { background: #fff; }
   background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   opacity: 0; transition: opacity 0.3s ease;
+  pointer-events: none;
 }
-.mobile-menu-overlay.active { opacity: 1; }
+.mobile-menu-overlay.active { opacity: 1; pointer-events: auto; }
 
 /* ── Mobile Menu Drawer ────────────────────────────────────── */
 .mobile-menu {
