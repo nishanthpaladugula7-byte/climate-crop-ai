@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Results — AI Recommendations{% endblock %}
+
+{% block content %}
+  <!-- ── Results ── -->
+  <section class="section" id="results">
+    <div class="section-header">
+      <div class="section-tag">Step 02</div>
+      <h2 class="section-title">AI Recommendations</h2>
+      <p class="section-desc">Top crops ranked by resilience score for your specific conditions.</p>
+    </div>
+
+    <!-- No Results Placeholder -->
+    <div id="noResults" class="text-center py-20">
+      <div class="text-6xl mb-6">🔍</div>
+      <h3 class="text-2xl font-display font-bold text-forest-300">No active plan found</h3>
+      <p class="text-forest-700 mt-2 mb-8">Please complete the field profile to get AI recommendations.</p>
+      <a href="/planner" class="btn-primary inline-flex">Go to Planner</a>
+    </div>
+
+    <!-- Climate Risk Banner -->
+    <div class="risk-banner hidden" id="riskBanner">
+      <div class="risk-banner-left">
+        <div class="risk-score-ring" id="riskRing">
+          <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="263" stroke-dashoffset="263" id="riskCircle" /></svg>
+          <span id="riskScoreNum">0</span>
+        </div>
+        <div>
+          <div class="risk-banner-title">Climate Risk Score</div>
+          <div class="risk-banner-sub" id="riskBannerSub">Calculating...</div>
+        </div>
+      </div>
+      <div class="risk-banner-right">
+        <div class="risk-meta" id="riskMeta"></div>
+        <button class="export-btn" onclick="downloadPDF()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Top 3 Crop Cards -->
+    <div class="crop-cards-grid" id="cropCardsGrid"></div>
+
+    <!-- Comparison Table -->
+    <div class="comparison-section hidden" id="comparisonSection">
+      <h3 class="comparison-title">Full Crop Comparison</h3>
+      <div class="table-wrapper">
+        <table class="comparison-table" id="comparisonTable">
+          <thead>
+            <tr>
+              <th>Crop</th>
+              <th>Score</th>
+              <th>Risk</th>
+              <th>Yield Stability</th>
+              <th>Water Need</th>
+              <th>Growth Days</th>
+              <th>Market Value</th>
+            </tr>
+          </thead>
+          <tbody id="comparisonBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+{% endblock %}
