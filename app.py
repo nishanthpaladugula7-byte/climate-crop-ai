@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from typing import Dict, List, Any
 import sys
-import os
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
@@ -306,6 +305,4 @@ def get_locations():
     return jsonify(list(WEATHER_HISTORY.keys()))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
-
+    app.run(debug=True, port=5000, threaded=True)
