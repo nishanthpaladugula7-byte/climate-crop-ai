@@ -757,7 +757,7 @@ async function detectLocation() {
     
     const locationSel = document.getElementById('location');
     if (locationSel) {
-        locationSel.value = "Maharashtra"; // Mocking state
+        locationSel.value = "Andhra Pradesh"; // Mocking state
         locationSel.dispatchEvent(new Event('change'));
     }
   }, (err) => {
