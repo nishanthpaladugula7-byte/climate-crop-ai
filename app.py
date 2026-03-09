@@ -1,178 +1,405 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+import random
 from typing import Dict, List, Any
 import sys
 import os
+import requests  # type: ignore
+from collections import Counter
+from flask_login import (  # type: ignore
+    LoginManager,
+    login_user,
+    current_user,
+    logout_user,
+    login_required,
+)
+from flask_bcrypt import Bcrypt  # type: ignore
+from models import db, User, FarmProfile, SavedPlan  # type: ignore
 
-app = Flask(__name__, static_folder='static', static_url_path='/static')
+app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "default_dev_secret_key")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
+# Initialize extensions
+db.init_app(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message_category = "info"
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+with app.app_context():
+    db.create_all()
+
 
 # ─── Farmer Feedback Store ────────────────────────────────────────────────────
 feedback_list = []
 
 # Seed with some realistic testimonials
-feedback_list.extend([
-    {"name": "Ramesh Kumar", "state": "Punjab", "crop": "Wheat", "problem_type": "other",
-     "message": "The crop recommendation helped me choose wheat this season. The weather alerts were spot on and saved my field from unexpected frost.",
-     "rating": "5", "photo": None},
-    {"name": "Suresh Reddy", "state": "Andhra Pradesh", "crop": "Rice", "problem_type": "other",
-     "message": "The weather alerts helped protect my crop from the cyclone. Excellent tool for every farmer!",
-     "rating": "5", "photo": None},
-    {"name": "Priya Devi", "state": "Tamil Nadu", "crop": "Sugarcane", "problem_type": "crop_recommendation",
-     "message": "I tried the sugarcane recommendation and got a great yield this year. Very accurate tool.",
-     "rating": "4", "photo": None},
-    {"name": "Mahesh Yadav", "state": "Uttar Pradesh", "crop": "Mustard", "problem_type": "other",
-     "message": "Helped me plan the right crop rotation. The economics section is very helpful for budgeting.",
-     "rating": "4", "photo": None},
-    {"name": "Anita Patel", "state": "Madhya Pradesh", "crop": "Soybean", "problem_type": "weather_prediction",
-     "message": "Weather prediction needs improvement for my region but crop advice is excellent.",
-     "rating": "3", "photo": None},
-])
+feedback_list.extend(
+    [
+        {
+            "name": "Ramesh Kumar",
+            "state": "Punjab",
+            "crop": "Wheat",
+            "problem_type": "other",
+            "message": "The crop recommendation helped me choose wheat this season. The weather alerts were spot on and saved my field from unexpected frost.",
+            "rating": "5",
+            "photo": None,
+        },
+        {
+            "name": "Suresh Reddy",
+            "state": "Andhra Pradesh",
+            "crop": "Rice",
+            "problem_type": "other",
+            "message": "The weather alerts helped protect my crop from the cyclone. Excellent tool for every farmer!",
+            "rating": "5",
+            "photo": None,
+        },
+        {
+            "name": "Priya Devi",
+            "state": "Tamil Nadu",
+            "crop": "Sugarcane",
+            "problem_type": "crop_recommendation",
+            "message": "I tried the sugarcane recommendation and got a great yield this year. Very accurate tool.",
+            "rating": "4",
+            "photo": None,
+        },
+        {
+            "name": "Mahesh Yadav",
+            "state": "Uttar Pradesh",
+            "crop": "Mustard",
+            "problem_type": "other",
+            "message": "Helped me plan the right crop rotation. The economics section is very helpful for budgeting.",
+            "rating": "4",
+            "photo": None,
+        },
+        {
+            "name": "Anita Patel",
+            "state": "Madhya Pradesh",
+            "crop": "Soybean",
+            "problem_type": "weather_prediction",
+            "message": "Weather prediction needs improvement for my region but crop advice is excellent.",
+            "rating": "3",
+            "photo": None,
+        },
+    ]
+)
 
 # ─── Crop Knowledge Base ───────────────────────────────────────────────────────
 CROP_DATABASE: Dict[str, Dict[str, Any]] = {
     "Rice": {
-        "icon": "🌾", "color": "#4CAF50",
-        "optimal_rainfall": (1200, 2000), "optimal_temp": (22, 35),
+        "icon": "🌾",
+        "color": "#4CAF50",
+        "optimal_rainfall": (1200, 2000),
+        "optimal_temp": (22, 35),
         "soils": ["Clay", "Loamy", "Silty"],
         "seasons": ["Kharif", "Rabi"],
-        "water_need": "High", "growth_days": 120,
+        "water_need": "High",
+        "growth_days": 120,
         "description": "Staple grain crop highly adaptable to flooded conditions.",
-        "market_value": "₹18-22/kg", "protein": "7.1g/100g",
+        "market_value": "₹18-22/kg",
+        "protein": "7.1g/100g",
         "irrigation": "Water every 3–4 days; 1200–1500 mm total.",
-        "economics": {"yield_per_acre": "2.5 tons", "price": "₹22/kg", "profit": "₹55,000/acre"},
-        "calendar": ["Sowing (Jun)", "Vegetative (Jul-Aug)", "Fertilization (Sep)", "Harvest (Oct)"],
-        "rotation": "Chickpea or Mustard"
+        "economics": {
+            "yield_per_acre": "2.5 tons",
+            "price": "₹22/kg",
+            "profit": "₹55,000/acre",
+        },
+        "calendar": [
+            "Sowing (Jun)",
+            "Vegetative (Jul-Aug)",
+            "Fertilization (Sep)",
+            "Harvest (Oct)",
+        ],
+        "rotation": "Chickpea or Mustard",
     },
     "Wheat": {
-        "icon": "🌿", "color": "#FFC107",
-        "optimal_rainfall": (400, 900), "optimal_temp": (10, 25),
+        "icon": "🌿",
+        "color": "#FFC107",
+        "optimal_rainfall": (400, 900),
+        "optimal_temp": (10, 25),
         "soils": ["Loamy", "Clay", "Sandy Loam"],
         "seasons": ["Rabi", "Winter"],
-        "water_need": "Medium", "growth_days": 110,
+        "water_need": "Medium",
+        "growth_days": 110,
         "description": "Cool-season cereal crop with high yield potential.",
-        "market_value": "₹20-25/kg", "protein": "12.6g/100g",
+        "market_value": "₹20-25/kg",
+        "protein": "12.6g/100g",
         "irrigation": "Water every 7–10 days; 450–650 mm total.",
-        "economics": {"yield_per_acre": "2.0 tons", "price": "₹25/kg", "profit": "₹50,000/acre"},
-        "calendar": ["Sowing (Nov)", "Tillering (Dec-Jan)", "Flowering (Feb)", "Harvest (Mar-Apr)"],
-        "rotation": "Maize or Soybean"
+        "economics": {
+            "yield_per_acre": "2.0 tons",
+            "price": "₹25/kg",
+            "profit": "₹50,000/acre",
+        },
+        "calendar": [
+            "Sowing (Nov)",
+            "Tillering (Dec-Jan)",
+            "Flowering (Feb)",
+            "Harvest (Mar-Apr)",
+        ],
+        "rotation": "Maize or Soybean",
     },
     "Maize": {
-        "icon": "🌽", "color": "#FF9800",
-        "optimal_rainfall": (600, 1100), "optimal_temp": (18, 32),
+        "icon": "🌽",
+        "color": "#FF9800",
+        "optimal_rainfall": (600, 1100),
+        "optimal_temp": (18, 32),
         "soils": ["Sandy Loam", "Loamy", "Clay"],
         "seasons": ["Kharif", "Summer"],
-        "water_need": "Medium", "growth_days": 90,
+        "water_need": "Medium",
+        "growth_days": 90,
         "description": "Versatile crop suitable for food, feed, and biofuel.",
-        "market_value": "₹15-18/kg", "protein": "9.4g/100g",
+        "market_value": "₹15-18/kg",
+        "protein": "9.4g/100g",
         "irrigation": "Water every 5–7 days; 500–800 mm total.",
-        "economics": {"yield_per_acre": "3.0 tons", "price": "₹18/kg", "profit": "₹54,000/acre"},
-        "calendar": ["Sowing (Jun/Mar)", "Growth (Jul/Apr)", "Tasseling (Aug/May)", "Harvest (Sep/Jun)"],
-        "rotation": "Mustard or Wheat"
+        "economics": {
+            "yield_per_acre": "3.0 tons",
+            "price": "₹18/kg",
+            "profit": "₹54,000/acre",
+        },
+        "calendar": [
+            "Sowing (Jun/Mar)",
+            "Growth (Jul/Apr)",
+            "Tasseling (Aug/May)",
+            "Harvest (Sep/Jun)",
+        ],
+        "rotation": "Mustard or Wheat",
     },
     "Cotton": {
-        "icon": "☁️", "color": "#9C27B0",
-        "optimal_rainfall": (600, 1200), "optimal_temp": (20, 35),
+        "icon": "☁️",
+        "color": "#9C27B0",
+        "optimal_rainfall": (600, 1200),
+        "optimal_temp": (20, 35),
         "soils": ["Black Cotton", "Sandy Loam", "Loamy"],
         "seasons": ["Kharif"],
-        "water_need": "Medium-High", "growth_days": 160,
+        "water_need": "Medium-High",
+        "growth_days": 160,
         "description": "Cash crop ideal for black soil regions with warm climate.",
-        "market_value": "₹55-65/kg", "protein": "N/A",
+        "market_value": "₹55-65/kg",
+        "protein": "N/A",
         "irrigation": "Water every 10–12 days; 700–1200 mm total.",
-        "economics": {"yield_per_acre": "0.8 tons", "price": "₹65/kg", "profit": "₹52,000/acre"},
-        "calendar": ["Sowing (May-Jun)", "Squaring (Aug)", "Bols (Sep-Oct)", "Picking (Nov-Dec)"],
-        "rotation": "Groundnut or Gram"
+        "economics": {
+            "yield_per_acre": "0.8 tons",
+            "price": "₹65/kg",
+            "profit": "₹52,000/acre",
+        },
+        "calendar": [
+            "Sowing (May-Jun)",
+            "Squaring (Aug)",
+            "Bols (Sep-Oct)",
+            "Picking (Nov-Dec)",
+        ],
+        "rotation": "Groundnut or Gram",
     },
     "Soybean": {
-        "icon": "🫘", "color": "#8BC34A",
-        "optimal_rainfall": (500, 900), "optimal_temp": (20, 30),
+        "icon": "🫘",
+        "color": "#8BC34A",
+        "optimal_rainfall": (500, 900),
+        "optimal_temp": (20, 30),
         "soils": ["Loamy", "Sandy Loam", "Clay"],
         "seasons": ["Kharif"],
-        "water_need": "Medium", "growth_days": 100,
+        "water_need": "Medium",
+        "growth_days": 100,
         "description": "Nitrogen-fixing legume with high protein content.",
-        "market_value": "₹38-45/kg", "protein": "36.5g/100g",
+        "market_value": "₹38-45/kg",
+        "protein": "36.5g/100g",
         "irrigation": "Water every 7–10 days; 450–700 mm total.",
-        "economics": {"yield_per_acre": "1.2 tons", "price": "₹45/kg", "profit": "₹54,000/acre"},
-        "calendar": ["Sowing (Jun)", "Seedling (Jul)", "Flowering (Aug)", "Harvest (Sep-Oct)"],
-        "rotation": "Wheat or Mustard"
+        "economics": {
+            "yield_per_acre": "1.2 tons",
+            "price": "₹45/kg",
+            "profit": "₹54,000/acre",
+        },
+        "calendar": [
+            "Sowing (Jun)",
+            "Seedling (Jul)",
+            "Flowering (Aug)",
+            "Harvest (Sep-Oct)",
+        ],
+        "rotation": "Wheat or Mustard",
     },
     "Sugarcane": {
-        "icon": "🎋", "color": "#00BCD4",
-        "optimal_rainfall": (1000, 2000), "optimal_temp": (25, 35),
+        "icon": "🎋",
+        "color": "#00BCD4",
+        "optimal_rainfall": (1000, 2000),
+        "optimal_temp": (25, 35),
         "soils": ["Loamy", "Clay", "Alluvial"],
         "seasons": ["Kharif", "Rabi", "Summer", "Winter"],
-        "water_need": "Very High", "growth_days": 365,
+        "water_need": "Very High",
+        "growth_days": 365,
         "description": "High-value cash crop for sugar and ethanol production.",
-        "market_value": "₹3.1-3.5/kg", "protein": "N/A",
+        "market_value": "₹3.1-3.5/kg",
+        "protein": "N/A",
         "irrigation": "Water every 10–15 days; 1500–2500 mm total.",
-        "economics": {"yield_per_acre": "35 tons", "price": "₹3.5/kg", "profit": "₹1,22,500/acre"},
-        "calendar": ["Planting (Jan-Mar)", "Tillering (Apr-Jun)", "Growth (Jul-Oct)", "Harvest (Dec-Mar)"],
-        "rotation": "Pulses or Green Manure"
+        "economics": {
+            "yield_per_acre": "35 tons",
+            "price": "₹3.5/kg",
+            "profit": "₹1,22,500/acre",
+        },
+        "calendar": [
+            "Planting (Jan-Mar)",
+            "Tillering (Apr-Jun)",
+            "Growth (Jul-Oct)",
+            "Harvest (Dec-Mar)",
+        ],
+        "rotation": "Pulses or Green Manure",
     },
     "Groundnut": {
-        "icon": "🥜", "color": "#795548",
-        "optimal_rainfall": (400, 800), "optimal_temp": (22, 33),
+        "icon": "🥜",
+        "color": "#795548",
+        "optimal_rainfall": (400, 800),
+        "optimal_temp": (22, 33),
         "soils": ["Sandy Loam", "Sandy", "Loamy"],
         "seasons": ["Kharif", "Rabi"],
-        "water_need": "Low-Medium", "growth_days": 120,
+        "water_need": "Low-Medium",
+        "growth_days": 120,
         "description": "Drought-tolerant oilseed crop with sandy soil preference.",
-        "market_value": "₹45-55/kg", "protein": "25.8g/100g",
+        "market_value": "₹45-55/kg",
+        "protein": "25.8g/100g",
         "irrigation": "Water every 12–15 days; 400–600 mm total.",
-        "economics": {"yield_per_acre": "1.0 tons", "price": "₹55/kg", "profit": "₹55,000/acre"},
-        "calendar": ["Sowing (Jun/Oct)", "Pegging (Jul/Nov)", "Pod formation (Aug/Dec)", "Harvest (Oct/Feb)"],
-        "rotation": "Cotton or Sunflower"
+        "economics": {
+            "yield_per_acre": "1.0 tons",
+            "price": "₹55/kg",
+            "profit": "₹55,000/acre",
+        },
+        "calendar": [
+            "Sowing (Jun/Oct)",
+            "Pegging (Jul/Nov)",
+            "Pod formation (Aug/Dec)",
+            "Harvest (Oct/Feb)",
+        ],
+        "rotation": "Cotton or Sunflower",
     },
     "Tomato": {
-        "icon": "🍅", "color": "#F44336",
-        "optimal_rainfall": (400, 800), "optimal_temp": (18, 28),
+        "icon": "🍅",
+        "color": "#F44336",
+        "optimal_rainfall": (400, 800),
+        "optimal_temp": (18, 28),
         "soils": ["Sandy Loam", "Loamy", "Silty"],
         "seasons": ["Rabi", "Summer"],
-        "water_need": "Medium", "growth_days": 75,
+        "water_need": "Medium",
+        "growth_days": 75,
         "description": "High-value vegetable crop with good market demand.",
-        "market_value": "₹15-40/kg", "protein": "0.9g/100g",
+        "market_value": "₹15-40/kg",
+        "protein": "0.9g/100g",
         "irrigation": "Water every 3–5 days; 400–600 mm total.",
-        "economics": {"yield_per_acre": "8.0 tons", "price": "₹20/kg", "profit": "₹1,60,000/acre"},
-        "calendar": ["Nursery (Nov-Dec)", "Transplant (Jan)", "Growth (Feb)", "Harvest (Mar-Apr)"],
-        "rotation": "Beans or Cabbage"
+        "economics": {
+            "yield_per_acre": "8.0 tons",
+            "price": "₹20/kg",
+            "profit": "₹1,60,000/acre",
+        },
+        "calendar": [
+            "Nursery (Nov-Dec)",
+            "Transplant (Jan)",
+            "Growth (Feb)",
+            "Harvest (Mar-Apr)",
+        ],
+        "rotation": "Beans or Cabbage",
     },
     "Chickpea": {
-        "icon": "🌱", "color": "#607D8B",
-        "optimal_rainfall": (300, 700), "optimal_temp": (15, 28),
+        "icon": "🌱",
+        "color": "#607D8B",
+        "optimal_rainfall": (300, 700),
+        "optimal_temp": (15, 28),
         "soils": ["Sandy Loam", "Loamy", "Clay"],
         "seasons": ["Rabi", "Winter"],
-        "water_need": "Low", "growth_days": 95,
+        "water_need": "Low",
+        "growth_days": 95,
         "description": "Drought-resistant pulse crop with high protein value.",
-        "market_value": "₹55-70/kg", "protein": "19g/100g",
+        "market_value": "₹55-70/kg",
+        "protein": "19g/100g",
         "irrigation": "Water only if needed; 200–300 mm total.",
-        "economics": {"yield_per_acre": "0.7 tons", "price": "₹70/kg", "profit": "₹49,000/acre"},
-        "calendar": ["Sowing (Oct-Nov)", "Flowering (Jan)", "Podding (Feb)", "Harvest (Mar)"],
-        "rotation": "Rice or Sorghum"
+        "economics": {
+            "yield_per_acre": "0.7 tons",
+            "price": "₹70/kg",
+            "profit": "₹49,000/acre",
+        },
+        "calendar": [
+            "Sowing (Oct-Nov)",
+            "Flowering (Jan)",
+            "Podding (Feb)",
+            "Harvest (Mar)",
+        ],
+        "rotation": "Rice or Sorghum",
     },
     "Mustard": {
-        "icon": "🌼", "color": "#FFEB3B",
-        "optimal_rainfall": (250, 600), "optimal_temp": (10, 22),
+        "icon": "🌼",
+        "color": "#FFEB3B",
+        "optimal_rainfall": (250, 600),
+        "optimal_temp": (10, 22),
         "soils": ["Loamy", "Sandy Loam", "Clay"],
         "seasons": ["Rabi", "Winter"],
-        "water_need": "Low", "growth_days": 110,
+        "water_need": "Low",
+        "growth_days": 110,
         "description": "Cool-season oilseed crop with excellent drought tolerance.",
-        "market_value": "₹48-58/kg", "protein": "25g/100g",
+        "market_value": "₹48-58/kg",
+        "protein": "25g/100g",
         "irrigation": "Water every 15–20 days; 250–400 mm total.",
-        "economics": {"yield_per_acre": "0.6 tons", "price": "₹58/kg", "profit": "₹34,800/acre"},
-        "calendar": ["Sowing (Oct)", "Vegetative (Nov-Dec)", "Flowering (Jan)", "Harvest (Feb-Mar)"],
-        "rotation": "Maize or Pearl Millet"
-    }
+        "economics": {
+            "yield_per_acre": "0.6 tons",
+            "price": "₹58/kg",
+            "profit": "₹34,800/acre",
+        },
+        "calendar": [
+            "Sowing (Oct)",
+            "Vegetative (Nov-Dec)",
+            "Flowering (Jan)",
+            "Harvest (Feb-Mar)",
+        ],
+        "rotation": "Maize or Pearl Millet",
+    },
 }
 
 WEATHER_HISTORY: Dict[str, Dict[str, List[float]]] = {
-    "Andhra Pradesh": {"avg_rainfall": [12, 8, 12, 28, 65, 55, 115, 155, 155, 155, 85, 22], "avg_temp": [26, 28, 32, 35, 36, 33, 30, 30, 30, 28, 26, 25]},
-    "Telangana": {"avg_rainfall": [10, 8, 10, 25, 55, 95, 175, 165, 145, 105, 45, 12], "avg_temp": [25, 28, 32, 36, 38, 34, 29, 28, 29, 27, 25, 24]},
-    "Tamil Nadu": {"avg_rainfall": [35, 22, 15, 28, 52, 45, 85, 125, 145, 295, 345, 155], "avg_temp": [28, 30, 33, 35, 36, 34, 32, 32, 31, 29, 27, 27]},
-    "Uttar Pradesh": {"avg_rainfall": [22, 18, 12, 8, 22, 95, 255, 265, 185, 38, 8, 12], "avg_temp": [14, 18, 25, 32, 37, 38, 34, 33, 30, 25, 18, 13]},
-    "Madhya Pradesh": {"avg_rainfall": [18, 12, 8, 8, 22, 135, 325, 285, 185, 42, 12, 8], "avg_temp": [18, 22, 28, 34, 38, 36, 30, 28, 29, 27, 21, 17]},
-    "Punjab": {"avg_rainfall": [45, 38, 52, 78, 92, 110, 185, 195, 125, 45, 12, 8], "avg_temp": [13, 16, 22, 30, 35, 38, 35, 33, 30, 25, 17, 13]},
+    "Andhra Pradesh": {
+        "avg_rainfall": [12, 8, 12, 28, 65, 55, 115, 155, 155, 155, 85, 22],
+        "avg_temp": [26, 28, 32, 35, 36, 33, 30, 30, 30, 28, 26, 25],
+    },
+    "Telangana": {
+        "avg_rainfall": [10, 8, 10, 25, 55, 95, 175, 165, 145, 105, 45, 12],
+        "avg_temp": [25, 28, 32, 36, 38, 34, 29, 28, 29, 27, 25, 24],
+    },
+    "Tamil Nadu": {
+        "avg_rainfall": [35, 22, 15, 28, 52, 45, 85, 125, 145, 295, 345, 155],
+        "avg_temp": [28, 30, 33, 35, 36, 34, 32, 32, 31, 29, 27, 27],
+    },
+    "Uttar Pradesh": {
+        "avg_rainfall": [22, 18, 12, 8, 22, 95, 255, 265, 185, 38, 8, 12],
+        "avg_temp": [14, 18, 25, 32, 37, 38, 34, 33, 30, 25, 18, 13],
+    },
+    "Madhya Pradesh": {
+        "avg_rainfall": [18, 12, 8, 8, 22, 135, 325, 285, 185, 42, 12, 8],
+        "avg_temp": [18, 22, 28, 34, 38, 36, 30, 28, 29, 27, 21, 17],
+    },
+    "Punjab": {
+        "avg_rainfall": [45, 38, 52, 78, 92, 110, 185, 195, 125, 45, 12, 8],
+        "avg_temp": [13, 16, 22, 30, 35, 38, 35, 33, 30, 25, 17, 13],
+    },
 }
 
-DEFAULT_WEATHER: Dict[str, List[float]] = {"avg_rainfall": [25, 20, 15, 10, 30, 120, 220, 200, 150, 55, 20, 10], "avg_temp": [20, 22, 27, 32, 36, 35, 30, 29, 28, 25, 20, 18]}
+STATE_COORDS = {
+    "Andhra Pradesh": (15.9129, 79.7400),
+    "Telangana": (18.1124, 79.0193),
+    "Tamil Nadu": (11.1271, 78.6569),
+    "Uttar Pradesh": (26.8467, 80.9462),
+    "Madhya Pradesh": (22.9734, 78.6569),
+    "Punjab": (31.1471, 75.3412),
+}
 
-def calculate_crop_score(crop_data: Dict[str, Any], user_data: Dict[str, Any]) -> Dict[str, Any]:
+DEFAULT_WEATHER: Dict[str, List[float]] = {
+    "avg_rainfall": [25, 20, 15, 10, 30, 120, 220, 200, 150, 55, 20, 10],
+    "avg_temp": [20, 22, 27, 32, 36, 35, 30, 29, 28, 25, 20, 18],
+}
+
+
+def calculate_crop_score(
+    crop_data: Dict[str, Any], user_data: Dict[str, Any]
+) -> Dict[str, Any]:
     # Scale monthly rainfall to annual for comparison with database ranges
     rainfall = float(user_data["rainfall"]) * 12
     temp = float(user_data["temperature"])
@@ -185,13 +412,15 @@ def calculate_crop_score(crop_data: Dict[str, Any], user_data: Dict[str, Any]) -
     # Rainfall score (0.0-40.0)
     r_center = (r_min + r_max) / 2.0
     r_range = (r_max - r_min) / 2.0
-    if r_range == 0: r_range = 1.0
+    if r_range == 0:
+        r_range = 1.0
     r_score = max(0.0, 40.0 * (1.0 - abs(rainfall - r_center) / (r_range * 1.8)))
 
     # Temperature score (0.0-35.0)
     t_center = (t_min + t_max) / 2.0
     t_range = (t_max - t_min) / 2.0
-    if t_range == 0: t_range = 1.0
+    if t_range == 0:
+        t_range = 1.0
     t_score = max(0.0, 35.0 * (1.0 - abs(temp - t_center) / (t_range * 1.8)))
 
     # Soil compatibility (0.0-15.0)
@@ -203,7 +432,9 @@ def calculate_crop_score(crop_data: Dict[str, Any], user_data: Dict[str, Any]) -
     total = r_score + t_score + s_score + season_score
 
     # Risk calculation
-    deviation = abs(rainfall - r_center) / max(r_center, 1.0) + abs(temp - t_center) / max(t_center, 1.0)
+    deviation = abs(rainfall - r_center) / max(r_center, 1.0) + abs(
+        temp - t_center
+    ) / max(t_center, 1.0)
     if deviation < 0.25:
         risk = "Low"
     elif deviation < 0.55:
@@ -224,6 +455,7 @@ def calculate_crop_score(crop_data: Dict[str, Any], user_data: Dict[str, Any]) -
         "season_match": round(float(season_score) / 10.0 * 100.0),
     }
 
+
 def get_climate_risk_score(rainfall: float, temp: float, location: str) -> int:
     hist = WEATHER_HISTORY.get(location, DEFAULT_WEATHER)
     avg_annual = sum(hist["avg_rainfall"])
@@ -232,28 +464,134 @@ def get_climate_risk_score(rainfall: float, temp: float, location: str) -> int:
     rainfall_deviation = abs(rainfall - avg_annual / 12.0) / max(avg_annual / 12.0, 1.0)
     temp_deviation = abs(temp - avg_temp_annual) / max(avg_temp_annual, 1.0)
 
-    risk_score = min(100, int((rainfall_deviation * 40.0 + temp_deviation * 30.0) * 2.5 + 20.0))
+    risk_score = min(
+        100, int((rainfall_deviation * 40.0 + temp_deviation * 30.0) * 2.5 + 20.0)
+    )
     return risk_score
+
 
 @app.route("/")
 def home():
     return render_template("home.html")
 
+
 @app.route("/planner")
 def planner():
     return render_template("planner.html")
+
 
 @app.route("/results")
 def results():
     return render_template("results.html")
 
+
 @app.route("/insights")
 def insights():
     return render_template("insights.html")
 
+
 @app.route("/doctor")
 def doctor():
     return render_template("doctor.html")
+
+
+@app.route("/api/doctor/analyze", methods=["POST"])
+def doctor_analyze():
+    data = request.json or {}
+    analyze_type = data.get("type")
+
+    if analyze_type == "image":
+        mock_diseases = [
+            {
+                "name": "Early Blight (Alternaria solani)",
+                "confidence": 92,
+                "treatments": [
+                    "Apply copper-based fungicide immediately.",
+                    "Remove and destroy affected leaves.",
+                    "Improve spacing for better air circulation.",
+                ],
+                "prevention": "Rotate crops every 2 years and avoid overhead watering to keep foliage dry.",
+            },
+            {
+                "name": "Leaf Curl Virus",
+                "confidence": 88,
+                "treatments": [
+                    "Remove and burn infected plants immediately.",
+                    "Control whitefly population via sticky traps.",
+                    "Use neem oil as a deterrent.",
+                ],
+                "prevention": "Use virus-resistant seed varieties.",
+            },
+            {
+                "name": "Powdery Mildew",
+                "confidence": 95,
+                "treatments": [
+                    "Apply sulfur or potassium bicarbonate spray.",
+                    "Prune heavily infected parts.",
+                    "Water at the base of the plant only.",
+                ],
+                "prevention": "Ensure adequate sunlight and space between plants.",
+            },
+            {
+                "name": "Healthy Plant",
+                "confidence": 99,
+                "treatments": [
+                    "Keep up the good work!",
+                    "Maintain current watering schedule.",
+                    "Ensure balanced fertilization.",
+                ],
+                "prevention": "Continue regular monitoring for pests or discoloration.",
+            },
+        ]
+        result = random.choice(mock_diseases)
+        return jsonify(result)
+
+    elif analyze_type == "text":
+        text = data.get("text", "").lower()
+        response = "I can help with crop diseases, soil health, and fertilizers. Could you provide more details?"
+        if "yellow" in text or "spot" in text:
+            response = "This sounds like **Early Blight (Alternaria solani)**. Common symptoms are dark spots with concentric rings. Treat with copper-based fungicide and remove lower leaves."
+        elif "tomato" in text:
+            response = "Tomato plants thrive in warm, well-drained soil. They are prone to late blight in high-humidity seasons."
+        elif "soil" in text:
+            response = "Most crops prefer a pH of 6.0 to 7.0 (slightly acidic). Have you done a soil test recently?"
+        elif "fertilizer" in text or "npk" in text:
+            response = "Nitrogen (N) is key for leafy growth, Phosphorus (P) for roots, and Potassium (K) for fruit quality. Use a balanced fertilizer for general gardening."
+        return jsonify({"response": response})
+
+    return jsonify({"error": "Invalid request type"})
+
+
+@app.route("/calculator", methods=["GET", "POST"])
+def calculator():
+    if request.method == "POST":
+        crop = request.form.get("crop", "Rice")
+        acres = float(request.form.get("acres", 1.0))
+
+        # Simple mockup NPK logic
+        npk_base = {
+            "Rice": {"N": 40, "P": 20, "K": 20, "Cost": 1500},
+            "Wheat": {"N": 50, "P": 25, "K": 25, "Cost": 1800},
+            "Maize": {"N": 45, "P": 20, "K": 20, "Cost": 1600},
+            "Cotton": {"N": 60, "P": 30, "K": 30, "Cost": 2200},
+            "Sugarcane": {"N": 100, "P": 40, "K": 40, "Cost": 3500},
+            "Tomato": {"N": 30, "P": 15, "K": 15, "Cost": 1200},
+        }
+
+        req = npk_base.get(crop, {"N": 40, "P": 20, "K": 20, "Cost": 1500})
+        result = {
+            "N": float(f'{float(req["N"]) * acres:.2f}'),
+            "P": float(f'{float(req["P"]) * acres:.2f}'),
+            "K": float(f'{float(req["K"]) * acres:.2f}'),
+            "Cost": float(f'{float(req["Cost"]) * acres:.2f}'),
+        }
+        return render_template("calculator.html", result=result, crop=crop, acres=acres)
+
+    return render_template("calculator.html")
+
+
+feedback_list: List[Dict[str, Any]] = []  # In-memory storage for feedback
+
 
 @app.route("/feedback", methods=["GET", "POST"])
 def feedback():
@@ -270,7 +608,6 @@ def feedback():
         if "photo" in request.files:
             photo = request.files["photo"]
             if photo and photo.filename:
-                import os
                 upload_dir = os.path.join(app.static_folder, "uploads")
                 os.makedirs(upload_dir, exist_ok=True)
                 safe_name = photo.filename.replace(" ", "_")
@@ -278,20 +615,26 @@ def feedback():
                 photo_filename = safe_name
 
         if name and message:
-            feedback_list.append({
-                "name": name, "state": state, "crop": crop,
-                "problem_type": problem_type, "message": message,
-                "rating": rating, "photo": photo_filename
-            })
+            feedback_list.append(
+                {
+                    "name": name,
+                    "state": state,
+                    "crop": crop,
+                    "problem_type": problem_type,
+                    "message": message,
+                    "rating": rating,
+                    "photo": photo_filename,
+                }
+            )
 
         return redirect(url_for("feedback"))
 
     return render_template("feedback.html", feedbacks=feedback_list)
 
+
 @app.route("/api/feedback/trends")
 def feedback_trends():
     """Return AI-analyzed trend summary from feedback data."""
-    from collections import Counter
     if not feedback_list:
         return jsonify({"trends": [], "total": 0})
 
@@ -301,7 +644,9 @@ def feedback_trends():
         state_crop_issues[key] = state_crop_issues.get(key, 0) + 1
 
     problem_counts = Counter(fb.get("problem_type", "other") for fb in feedback_list)
-    avg_rating = sum(int(fb.get("rating", 3)) for fb in feedback_list) / max(len(feedback_list), 1)
+    avg_rating = sum(int(fb.get("rating", 3)) for fb in feedback_list) / max(
+        len(feedback_list), 1
+    )
 
     trends = []
     for (state, crop), count in sorted(state_crop_issues.items(), key=lambda x: -x[1]):
@@ -314,21 +659,133 @@ def feedback_trends():
             "website_bug": "website bugs",
             "crop_recommendation": "crop recommendation issues",
             "weather_prediction": "weather prediction issues",
-            "other": "general suggestions"
+            "other": "general suggestions",
         }
-        trends.insert(0, f"Top concern: {label_map.get(top_problem[0][0], top_problem[0][0])} ({top_problem[0][1]} reports)")
+        trends.insert(
+            0,
+            f"Top concern: {label_map.get(top_problem[0][0], top_problem[0][0])} ({top_problem[0][1]} reports)",
+        )
 
-    return jsonify({
-        "trends": trends[:5],
-        "total": len(feedback_list),
-        "avg_rating": round(avg_rating, 1)
-    })
+    return jsonify(
+        {
+            "trends": [trends[i] for i in range(min(5, len(trends)))],
+            "total": len(feedback_list),
+            "avg_rating": float(f"{avg_rating:.1f}"),
+        }
+    )
+
+
+# ─── USER AUTHENTICATION & DASHBOARD ─────────────────────────────────────────
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        if (
+            User.query.filter_by(username=username).first()
+            or User.query.filter_by(email=email).first()
+        ):
+            flash(
+                "Account already exists with that username or email. Please log in.",
+                "danger",
+            )
+            return redirect(url_for("login"))
+
+        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+        user = User(username=username, email=email, password=hashed_password)
+        db.session.add(user)
+        db.session.commit()
+        flash("Account created! You are now able to log in", "success")
+        return redirect(url_for("login"))
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        user = User.query.filter_by(email=email).first()
+        if user and bcrypt.check_password_hash(user.password, password):
+            login_user(user, remember=True)
+            next_page = request.args.get("next")
+            return redirect(next_page) if next_page else redirect(url_for("dashboard"))
+        else:
+            flash("Login Unsuccessful. Please check email and password", "danger")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    logout_user()
+    return redirect(url_for("home"))
+
+
+@app.route("/dashboard", methods=["GET", "POST"])
+@login_required
+def dashboard():
+    if request.method == "POST":
+        farm_name = request.form.get("farm_name", "").strip()
+        size_acres = request.form.get("size_acres")
+        state = request.form.get("state")
+        soil_type = request.form.get("soil_type")
+
+        if farm_name and size_acres:
+            try:
+                profile = FarmProfile(
+                    farm_name=farm_name,
+                    size_acres=float(size_acres),
+                    state=state,
+                    soil_type=soil_type,
+                    owner=current_user,
+                )
+                db.session.add(profile)
+                db.session.commit()
+                flash("Farm Profile created!", "success")
+            except ValueError:
+                flash("Invalid inputs given", "danger")
+        return redirect(url_for("dashboard"))
+
+    farms = FarmProfile.query.filter_by(user_id=current_user.id).all()
+    saved_plans = SavedPlan.query.filter_by(user_id=current_user.id).all()
+    return render_template("dashboard.html", farms=farms, saved_plans=saved_plans)
+
+
+@app.route("/api/save_plan", methods=["POST"])
+@login_required
+def save_plan():
+    data = request.json
+    try:
+        plan = SavedPlan(
+            user_id=current_user.id,
+            crop_name=data.get("crop_name"),
+            score=data.get("score"),
+            risk=data.get("risk"),
+            season=data.get("season"),
+        )
+        db.session.add(plan)
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
 
 @app.route("/api/predict", methods=["POST"])
 def predict():
     try:
         data = request.json
-        if not data or not all(k in data for k in ["location", "rainfall", "temperature", "season", "soil_type"]):
+        if not data or not all(
+            k in data
+            for k in ["location", "rainfall", "temperature", "season", "soil_type"]
+        ):
             return jsonify({"error": "Missing required fields"}), 400
 
         try:
@@ -341,57 +798,94 @@ def predict():
 
         for crop_name, crop_data in CROP_DATABASE.items():
             result = calculate_crop_score(crop_data, data)
-            scored_crops.append({
-                "name": crop_name,
-                "icon": crop_data["icon"],
-                "color": crop_data["color"],
-                "description": crop_data["description"],
-                "water_need": crop_data["water_need"],
-                "growth_days": crop_data["growth_days"],
-                "market_value": crop_data["market_value"],
-                "protein": crop_data["protein"],
-                "optimal_rainfall": crop_data["optimal_rainfall"],
-                "optimal_temp": crop_data["optimal_temp"],
-                "irrigation": crop_data.get("irrigation"),
-                "economics": crop_data.get("economics"),
-                "calendar": crop_data.get("calendar"),
-                "rotation": crop_data.get("rotation"),
-                **result
-            })
+            scored_crops.append(
+                {
+                    "name": crop_name,
+                    "icon": crop_data["icon"],
+                    "color": crop_data["color"],
+                    "description": crop_data["description"],
+                    "water_need": crop_data["water_need"],
+                    "growth_days": crop_data["growth_days"],
+                    "market_value": crop_data["market_value"],
+                    "protein": crop_data["protein"],
+                    "optimal_rainfall": crop_data["optimal_rainfall"],
+                    "optimal_temp": crop_data["optimal_temp"],
+                    "irrigation": crop_data.get("irrigation"),
+                    "economics": crop_data.get("economics"),
+                    "calendar": crop_data.get("calendar"),
+                    "rotation": crop_data.get("rotation"),
+                    **result,
+                }
+            )
 
         scored_crops.sort(key=lambda x: x["score"], reverse=True)
-        top_3 = scored_crops[0:3]
+        top_3 = [scored_crops[i] for i in range(min(3, len(scored_crops)))]
 
         # Weather history for chart
         location = data.get("location", "Punjab")
         hist = WEATHER_HISTORY.get(location, DEFAULT_WEATHER)
 
-        climate_risk = get_climate_risk_score(
-            user_rainfall,
-            user_temp,
-            location
-        )
+        climate_risk = get_climate_risk_score(user_rainfall, user_temp, location)
 
-        return jsonify({
-            "recommendations": top_3,
-            "all_crops": scored_crops,
-            "weather_history": hist,
-            "climate_risk_score": climate_risk,
-            "location": location
-        })
+        weather_alerts = []
+        try:
+            coords = STATE_COORDS.get(
+                location, (20.5937, 78.9629)
+            )  # Default India centerish roughly
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={coords[0]}&longitude={coords[1]}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                forecast = resp.json()
+                daily = forecast.get("daily", {})
+                max_temps = daily.get("temperature_2m_max", [])
+                min_temps = daily.get("temperature_2m_min", [])
+                precip = daily.get("precipitation_sum", [])
+
+                if max_temps and max(max_temps) > 40:
+                    weather_alerts.append(
+                        "🔥 Heatwave Warning: Temperatures expected to exceed 40°C in the next 7 days."
+                    )
+                if min_temps and min(min_temps) < 5:
+                    weather_alerts.append(
+                        "❄️ Frost Warning: Temperatures expected to drop below 5°C."
+                    )
+                if precip and sum(precip) < 2:
+                    weather_alerts.append(
+                        "🏜️ Drought Alert: Very low precipitation expected in the next week."
+                    )
+                elif precip and sum(precip) > 100:
+                    weather_alerts.append(
+                        "🌧️ Heavy Rain Alert: High precipitation expected. Ensure proper drainage."
+                    )
+        except Exception as e:
+            print(f"Failed to fetch live weather: {e}", file=sys.stderr)
+
+        return jsonify(
+            {
+                "recommendations": top_3,
+                "all_crops": scored_crops,
+                "weather_history": hist,
+                "climate_risk_score": climate_risk,
+                "location": location,
+                "weather_alerts": weather_alerts,
+            }
+        )
     except Exception as e:
         print(f"Error in prediction: {e}", file=sys.stderr)
         return jsonify({"error": "An internal error occurred during prediction"}), 500
+
 
 @app.route("/api/weather/<location>")
 def get_weather(location):
     hist = WEATHER_HISTORY.get(location, DEFAULT_WEATHER)
     return jsonify(hist)
 
+
 @app.route("/api/locations")
 def get_locations():
     return jsonify(list(WEATHER_HISTORY.keys()))
 
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)

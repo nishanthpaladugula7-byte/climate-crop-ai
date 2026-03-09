@@ -577,6 +577,28 @@ function downloadPDF() {
   showToast('PDF downloaded successfully! 🎉', 'success');
 }
 
+// ── Social Sharing ──────────────────────────────────────────────────
+function shareWhatsApp() {
+  if (!currentResults || !currentResults.recommendations?.length) {
+    showToast('No recommendations available to share.', 'warning');
+    return;
+  }
+  const topCrop = currentResults.recommendations[0];
+  const inputs = JSON.parse(localStorage.getItem('lastInputs') || '{}');
+  const loc = inputs.location || 'my farm';
+  
+  let msg = `🌱 *Climate Crop AI Recommendation*\n\n`;
+  msg += `For ${loc}:\n`;
+  msg += `🥇 *Top Pick:* ${topCrop.icon} ${topCrop.name}\n`;
+  msg += `📊 *Resilience Score:* ${Math.round(topCrop.score)}/100\n`;
+  msg += `🛡️ *Risk Level:* ${topCrop.risk}\n`;
+  msg += `💧 *Water Need:* ${topCrop.irrigation || topCrop.water_need}\n\n`;
+  msg += `Plan your farm smarter with ClimateCrop! 🌾`;
+  
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
 // ── Toast ──────────────────────────────────────────────────────────
 function showToast(msg, type = 'info') {
   let container = document.getElementById('toastContainer');
@@ -673,6 +695,15 @@ window.addEventListener('DOMContentLoaded', () => {
     syncSlider('rainfallSlider', 'rainfall', 'rainfallVal', 'mm');
     syncSlider('temperatureSlider', 'temperature', 'temperatureVal', '°C');
 
+    const STATE_COORDS = {
+      "Andhra Pradesh": {lat: 15.9129, lon: 79.7400},
+      "Telangana": {lat: 18.1124, lon: 79.0193},
+      "Tamil Nadu": {lat: 11.1271, lon: 78.6569},
+      "Uttar Pradesh": {lat: 26.8467, lon: 80.9462},
+      "Madhya Pradesh": {lat: 22.9734, lon: 78.6569},
+      "Punjab": {lat: 31.1471, lon: 75.3412},
+    };
+
     document.getElementById('location').addEventListener('change', async (e) => {
       const loc = e.target.value;
       if (!loc) return;
@@ -688,6 +719,15 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('temperatureSlider').value = avgTemp;
         document.getElementById('rainfallSlider').dispatchEvent(new Event('input'));
         document.getElementById('temperatureSlider').dispatchEvent(new Event('input'));
+
+        // Also fetch live weather
+        if (STATE_COORDS[loc]) {
+          const weatherEl = document.getElementById('liveWeather');
+          if (weatherEl) weatherEl.classList.remove('hidden');
+          const locEl = document.getElementById('weatherLoc');
+          if (locEl) locEl.textContent = loc;
+          await fetchWeather(STATE_COORDS[loc].lat, STATE_COORDS[loc].lon);
+        }
       } catch (err) {
         console.error('Failed to fetch weather:', err);
       }
@@ -778,13 +818,29 @@ function selectState(state) {
 }
 
 async function fetchWeather(lat, lon) {
-  const mockWeather = {
-    temp: Math.floor(Math.random() * (35 - 20) + 20),
-    humidity: Math.floor(Math.random() * (80 - 40) + 40),
-    wind: Math.floor(Math.random() * 15 + 2),
-    condition: ['Sunny', 'Partly Cloudy', 'Overcast'][Math.floor(Math.random()*3)]
-  };
-  setTimeout(() => updateWeatherUI(mockWeather), 800);
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relativehumidity_2m`);
+    const data = await res.json();
+    const current = data.current_weather;
+    const humidity = data.hourly?.relativehumidity_2m[new Date().getHours()] || 50;
+    
+    const weatherCode = current.weathercode;
+    let condition = 'Sunny';
+    if (weatherCode > 3) condition = 'Partly Cloudy';
+    if (weatherCode > 50) condition = 'Rainy';
+    if (weatherCode > 70) condition = 'Snowy';
+    
+    updateWeatherUI({
+      temp: Math.round(current.temperature),
+      humidity: Math.round(humidity),
+      wind: Math.round(current.windspeed),
+      condition: condition
+    });
+  } catch (err) {
+    console.error('Weather API failed', err);
+    // fallback
+    setTimeout(() => updateWeatherUI({ temp: 28, humidity: 60, wind: 12, condition: 'Sunny' }), 800);
+  }
 }
 
 function updateWeatherUI(data) {

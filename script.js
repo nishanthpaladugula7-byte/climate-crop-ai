@@ -24,6 +24,38 @@ if (themeToggle) {
 // Apply initial theme
 document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
 
+// ──// Force Service Worker Unregistration to clear old caches for Phase 2-5 Features
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    let unregistrationPromise = Promise.resolve();
+    if(registrations.length > 0) {
+      console.log('Unregistering old service workers...');
+      for(let registration of registrations) {
+        unregistrationPromise = registration.unregister();
+      }
+      unregistrationPromise.then(() => {
+        // Clear caches
+        caches.keys().then(names => {
+          for (let name of names) caches.delete(name);
+        }).then(() => {
+          // Force reload once to grab new files
+          if (!sessionStorage.getItem('sw_cleared')) {
+            sessionStorage.setItem('sw_cleared', 'true');
+            window.location.reload(true);
+          }
+        });
+      });
+    }
+  });
+  
+  // Register the new v2 network-first service worker
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
 // ── Navbar scroll effect ───────────────────────────────────────────
 window.addEventListener('scroll', () => {
   const navbar = document.getElementById('navbar');
@@ -146,6 +178,17 @@ function renderResults(data) {
   if (noResults) noResults.classList.add('hidden');
   if (riskBanner) riskBanner.classList.remove('hidden');
   if (comparisonSection) comparisonSection.classList.remove('hidden');
+
+  const alertsContainer = document.getElementById('weatherAlerts');
+  if (alertsContainer && data.weather_alerts && data.weather_alerts.length > 0) {
+    alertsContainer.classList.remove('hidden');
+    alertsContainer.innerHTML = data.weather_alerts.map(alert => `
+      <div class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl flex items-center justify-between shadow-lg">
+        <span class="font-bold">${alert}</span>
+        <button onclick="this.parentElement.style.display='none'" class="text-xl leading-none opacity-70 hover:opacity-100">&times;</button>
+      </div>
+    `).join('');
+  }
 
   renderRiskBanner(data);
   renderCropCards(data.recommendations);
@@ -577,6 +620,54 @@ function downloadPDF() {
   showToast('PDF downloaded successfully! 🎉', 'success');
 }
 
+// ── WhatsApp Sharing ──────────────────────────────────────────────
+function shareWhatsApp() {
+  if (!currentResults || !currentResults.recommendations.length) return;
+  const topCrop = currentResults.recommendations[0];
+  const inputs = JSON.parse(localStorage.getItem('lastInputs') || '{}');
+  
+  const text = `🌱 *Climate Crop Planner Results*\n\n📍 Location: ${inputs.location || 'Unknown'}\n📈 Climate Risk Score: ${currentResults.climate_risk_score}/100\n\n🏆 *Top Recommendation*: ${topCrop.icon} ${topCrop.name}\n⭐ Score: ${Math.round(topCrop.score)} | Risk: ${topCrop.risk}\n💰 Est. Profit: ${topCrop.economics?.profit || '-'}\n\nCheck out the full plan on the Climate Crop Planner app!`;
+  
+  const encodedText = encodeURIComponent(text);
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+  window.open(whatsappUrl, '_blank');
+}
+
+// ── Save Plan (Backend Database) ──────────────────────────────────
+async function savePlan() {
+  if (!currentResults || !currentResults.recommendations.length) return;
+  const topCrop = currentResults.recommendations[0];
+  const inputs = JSON.parse(localStorage.getItem('lastInputs') || '{}');
+  
+  try {
+    const res = await fetch('/api/save_plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        crop_name: topCrop.name,
+        score: topCrop.score,
+        risk: topCrop.risk,
+        season: inputs.season || 'Unknown'
+      })
+    });
+    
+    if (res.redirected) {
+      window.location.href = res.url; // Handle redirect to login
+      return;
+    }
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast('Plan saved successfully to your Dashboard! 💾', 'success');
+    } else {
+      showToast('Error saving plan.', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to save plan. Are you logged in?', 'error');
+    console.error(err);
+  }
+}
+
 // ── Toast ──────────────────────────────────────────────────────────
 function showToast(msg, type = 'info') {
   let container = document.getElementById('toastContainer');
@@ -839,20 +930,48 @@ function analyzeLeaf() {
   btn.innerHTML = '🧪 Sequencing DNA...';
   if (scanLine) scanLine.style.display = 'block';
 
-  // Multi-stage analysis
-  setTimeout(() => { btn.innerHTML = '🔍 Mapping Pathogens...'; }, 1000);
-  setTimeout(() => { btn.innerHTML = '🤖 Running AI Inference...'; }, 2000);
+  // Hit backend for mock AI logic
+  fetch('/api/doctor/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'image' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    // Multi-stage fake animations before showing result
+    setTimeout(() => { btn.innerHTML = '🔍 Mapping Pathogens...'; }, 1000);
+    setTimeout(() => { btn.innerHTML = '🤖 Running AI Inference...'; }, 2000);
 
-  setTimeout(() => {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '⚡ Analyze Plant Health';
+      if (scanLine) scanLine.style.display = 'none';
+      
+      document.getElementById('issueName').textContent = data.name;
+      document.getElementById('confFill').style.width = data.confidence + '%';
+      document.getElementById('confVal').textContent = data.confidence + '%';
+      
+      const treatList = document.getElementById('treatmentList');
+      if (treatList) {
+        treatList.innerHTML = data.treatments.map(t => `<li>${t}</li>`).join('');
+      }
+      const preventionBox = document.querySelector('.prevention-text');
+      if (preventionBox) preventionBox.textContent = data.prevention;
+      
+      const resultBox = document.getElementById('doctorResult');
+      resultBox.classList.remove('hidden');
+      resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      showToast("Analysis complete! Solution generated.", "success");
+    }, 3000);
+  })
+  .catch(err => {
+    console.error(err);
     btn.disabled = false;
     btn.innerHTML = '⚡ Analyze Plant Health';
     if (scanLine) scanLine.style.display = 'none';
-    
-    document.getElementById('doctorResult').classList.remove('hidden');
-    document.getElementById('doctorResult').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    showToast("Analysis complete! Solution generated.", "success");
-  }, 3000);
+    showToast("Error analyzing image.", "error");
+  });
 }
 
 // ── AI Chatbot Functions (Global & Doctor Page) ───────────────────────
@@ -887,7 +1006,7 @@ function sendMessage() {
 }
 
 // Doctor Page Inline Chat
-function sendDoctorMessage() {
+async function sendDoctorMessage() {
   const input = document.getElementById('doctorChatInput');
   const msg = input.value.trim();
   if (!msg) return;
@@ -901,11 +1020,21 @@ function sendDoctorMessage() {
   if (indicator) indicator.classList.remove('hidden');
   container.scrollTop = container.scrollHeight;
 
-  setTimeout(() => {
+  try {
+    const res = await fetch('/api/doctor/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'text', text: msg })
+    });
+    const data = await res.json();
+    
     if (indicator) indicator.classList.add('hidden');
-    addMessage(container, getAIResponse(msg), 'ai', true);
-    container.scrollTop = container.scrollHeight;
-  }, 1500);
+    addMessage(container, data.response || "I couldn't process that.", 'ai', true);
+  } catch (err) {
+    if (indicator) indicator.classList.add('hidden');
+    addMessage(container, "Sorry, my servers are currently down.", 'ai', true);
+    console.error(err);
+  }
 }
 
 function addMessage(container, text, type, isDoctor = false) {
