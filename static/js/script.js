@@ -993,3 +993,47 @@ function stopRecording() {
     const micBtn = document.getElementById('micBtn');
     if (micBtn) micBtn.classList.remove('recording');
 }
+
+// ── Mobile Menu ──────────────────────────────────────────────────────
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileMenuOverlay');
+  const btn = document.getElementById('mobileMenuBtn');
+  if (!menu) return;
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) {
+    closeMobileMenu();
+  } else {
+    menu.classList.add('open');
+    overlay.classList.add('active');
+    btn.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileMenuOverlay');
+  const btn = document.getElementById('mobileMenuBtn');
+  if (!menu) return;
+  menu.classList.remove('open');
+  overlay.classList.remove('active');
+  if (btn) btn.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Close mobile menu on ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeMobileMenu();
+});
+
+// Highlight active mobile nav link
+document.addEventListener('DOMContentLoaded', () => {
+  const path = window.location.pathname;
+  document.querySelectorAll('.mobile-nav-link').forEach(link => {
+    if (link.getAttribute('href') === path) {
+      link.style.background = 'var(--accent-glow)';
+      link.style.color = 'var(--accent)';
+    }
+  });
+});

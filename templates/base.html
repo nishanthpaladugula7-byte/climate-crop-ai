@@ -68,9 +68,33 @@
           <span class="sun-icon">☀️</span>
           <span class="moon-icon">🌙</span>
         </button>
+        <!-- Hamburger Button (mobile only) -->
+        <button id="mobileMenuBtn" class="hamburger-btn" aria-label="Open menu" onclick="toggleMobileMenu()">
+          <span class="ham-line"></span>
+          <span class="ham-line"></span>
+          <span class="ham-line"></span>
+        </button>
       </div>
     </div>
   </nav>
+
+  <!-- ── Mobile Menu Overlay ── -->
+  <div id="mobileMenuOverlay" class="mobile-menu-overlay" onclick="closeMobileMenu()"></div>
+  <div id="mobileMenu" class="mobile-menu">
+    <div class="mobile-menu-header">
+      <span class="logo-mark">🌱</span>
+      <span class="logo-text">Climate<strong>Crop</strong></span>
+      <button class="mobile-menu-close" onclick="closeMobileMenu()" aria-label="Close menu">✕</button>
+    </div>
+    <nav class="mobile-nav-links">
+      <a href="/" class="mobile-nav-link" onclick="closeMobileMenu()">🏠 Home</a>
+      <a href="/planner" class="mobile-nav-link" onclick="closeMobileMenu()">🌾 Planner</a>
+      <a href="/results" class="mobile-nav-link" onclick="closeMobileMenu()">📊 Results</a>
+      <a href="/insights" class="mobile-nav-link" onclick="closeMobileMenu()">💡 Insights</a>
+      <a href="/doctor" class="mobile-nav-link" onclick="closeMobileMenu()">🩺 Plant Doctor</a>
+      <a href="/feedback" class="mobile-nav-link mobile-feedback-link" onclick="closeMobileMenu()">🌾 Farmer Feedback</a>
+    </nav>
+  </div>
 
   <main>
     {% block content %}{% endblock %}
