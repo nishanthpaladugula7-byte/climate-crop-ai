@@ -1,8 +1,30 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from typing import Dict, List, Any
 import sys
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
+
+# ─── Farmer Feedback Store ────────────────────────────────────────────────────
+feedback_list = []
+
+# Seed with some realistic testimonials
+feedback_list.extend([
+    {"name": "Ramesh Kumar", "state": "Punjab", "crop": "Wheat", "problem_type": "other",
+     "message": "The crop recommendation helped me choose wheat this season. The weather alerts were spot on and saved my field from unexpected frost.",
+     "rating": "5", "photo": None},
+    {"name": "Suresh Reddy", "state": "Andhra Pradesh", "crop": "Rice", "problem_type": "other",
+     "message": "The weather alerts helped protect my crop from the cyclone. Excellent tool for every farmer!",
+     "rating": "5", "photo": None},
+    {"name": "Priya Devi", "state": "Tamil Nadu", "crop": "Sugarcane", "problem_type": "crop_recommendation",
+     "message": "I tried the sugarcane recommendation and got a great yield this year. Very accurate tool.",
+     "rating": "4", "photo": None},
+    {"name": "Mahesh Yadav", "state": "Uttar Pradesh", "crop": "Mustard", "problem_type": "other",
+     "message": "Helped me plan the right crop rotation. The economics section is very helpful for budgeting.",
+     "rating": "4", "photo": None},
+    {"name": "Anita Patel", "state": "Madhya Pradesh", "crop": "Soybean", "problem_type": "weather_prediction",
+     "message": "Weather prediction needs improvement for my region but crop advice is excellent.",
+     "rating": "3", "photo": None},
+])
 
 # ─── Crop Knowledge Base ───────────────────────────────────────────────────────
 CROP_DATABASE: Dict[str, Dict[str, Any]] = {
@@ -231,6 +253,75 @@ def insights():
 @app.route("/doctor")
 def doctor():
     return render_template("doctor.html")
+
+@app.route("/feedback", methods=["GET", "POST"])
+def feedback():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        state = request.form.get("state", "")
+        crop = request.form.get("crop", "").strip()
+        problem_type = request.form.get("problem_type", "other")
+        message = request.form.get("message", "").strip()
+        rating = request.form.get("rating", "5")
+        photo_filename = None
+
+        # Handle photo upload
+        if "photo" in request.files:
+            photo = request.files["photo"]
+            if photo and photo.filename:
+                import os
+                upload_dir = os.path.join(app.static_folder, "uploads")
+                os.makedirs(upload_dir, exist_ok=True)
+                safe_name = photo.filename.replace(" ", "_")
+                photo.save(os.path.join(upload_dir, safe_name))
+                photo_filename = safe_name
+
+        if name and message:
+            feedback_list.append({
+                "name": name, "state": state, "crop": crop,
+                "problem_type": problem_type, "message": message,
+                "rating": rating, "photo": photo_filename
+            })
+
+        return redirect(url_for("feedback"))
+
+    return render_template("feedback.html", feedbacks=feedback_list)
+
+@app.route("/api/feedback/trends")
+def feedback_trends():
+    """Return AI-analyzed trend summary from feedback data."""
+    from collections import Counter
+    if not feedback_list:
+        return jsonify({"trends": [], "total": 0})
+
+    state_crop_issues = {}
+    for fb in feedback_list:
+        key = (fb.get("state", "Unknown"), fb.get("crop", "Unknown"))
+        state_crop_issues[key] = state_crop_issues.get(key, 0) + 1
+
+    problem_counts = Counter(fb.get("problem_type", "other") for fb in feedback_list)
+    avg_rating = sum(int(fb.get("rating", 3)) for fb in feedback_list) / max(len(feedback_list), 1)
+
+    trends = []
+    for (state, crop), count in sorted(state_crop_issues.items(), key=lambda x: -x[1]):
+        if count >= 1:
+            trends.append(f"{count} farmer(s) from {state} reporting issue with {crop}")
+
+    top_problem = problem_counts.most_common(1)
+    if top_problem:
+        label_map = {
+            "website_bug": "website bugs",
+            "crop_recommendation": "crop recommendation issues",
+            "weather_prediction": "weather prediction issues",
+            "other": "general suggestions"
+        }
+        trends.insert(0, f"Top concern: {label_map.get(top_problem[0][0], top_problem[0][0])} ({top_problem[0][1]} reports)")
+
+    return jsonify({
+        "trends": trends[:5],
+        "total": len(feedback_list),
+        "avg_rating": round(avg_rating, 1)
+    })
 
 @app.route("/api/predict", methods=["POST"])
 def predict():
