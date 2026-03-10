@@ -1,206 +1,216 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Climate Crop Planner{% endblock %}
+{% block title %}Dashboard — Climate Crop Planner{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 pt-28 pb-12">
-  <div class="flex items-center justify-between mb-8">
+<div class="dashboard-page">
+
+  <!-- ── Header ── -->
+  <div class="dashboard-header">
     <div>
-      <h1 class="text-4xl font-display font-bold text-forest-300">My Dashboard</h1>
-      <p class="text-gray-400 mt-2">Welcome back, {{ current_user.username }}</p>
+      <h1 class="dashboard-title">🌾 My Dashboard</h1>
+      <p class="dashboard-welcome">Welcome back, <span>{{ current_user.username }}</span> — here's your farm overview.</p>
     </div>
-  </div>
-  
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <div class="bg-forest-900/40 backdrop-blur-xl border border-forest-500/20 rounded-2xl p-6 shadow-xl flex items-center justify-between">
-      <div>
-        <p class="text-forest-200 text-sm font-semibold uppercase tracking-wide">Total Farmers</p>
-        <p class="text-3xl font-display font-bold text-white mt-1">10,482</p>
-      </div>
-      <div class="w-12 h-12 rounded-full bg-forest-500/20 flex items-center justify-center text-xl border border-forest-500/30">👥</div>
-    </div>
-    
-    <div class="bg-forest-900/40 backdrop-blur-xl border border-forest-500/20 rounded-2xl p-6 shadow-xl flex items-center justify-between">
-      <div>
-        <p class="text-forest-200 text-sm font-semibold uppercase tracking-wide">Most Recommended</p>
-        <p class="text-2xl font-display font-bold text-green-400 mt-1">🌿 Wheat</p>
-      </div>
-      <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-xl border border-green-500/30">🏆</div>
-    </div>
-
-    <div class="bg-forest-900/40 backdrop-blur-xl border border-forest-500/20 rounded-2xl p-6 shadow-xl flex items-center justify-between">
-      <div>
-        <p class="text-forest-200 text-sm font-semibold uppercase tracking-wide">Your Saved Plans</p>
-        <p class="text-3xl font-display font-bold text-earth-400 mt-1">{{ saved_plans|length }}</p>
-      </div>
-      <div class="w-12 h-12 rounded-full bg-earth-500/20 flex items-center justify-center text-xl border border-earth-500/30">📋</div>
-    </div>
-
-    <div class="bg-forest-900/40 backdrop-blur-xl border border-forest-500/20 rounded-2xl p-6 shadow-xl flex items-center justify-between">
-      <div>
-        <p class="text-forest-200 text-sm font-semibold uppercase tracking-wide">Avg Success Rate</p>
-        <p class="text-3xl font-display font-bold text-accent mt-1">94%</p>
-      </div>
-      <div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-xl border border-accent/30">📈</div>
-    </div>
+    <a href="/logout" class="dashboard-logout-btn">🚪 Logout</a>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <!-- Farm Profiles Section -->
-    <div class="lg:col-span-2 space-y-8">
-      <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-        <h2 class="text-2xl font-display font-bold text-white mb-6 flex items-center gap-2">
-          <span>🚜</span> My Farm Profiles
-        </h2>
-        
-        {% if farms %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-          {% for farm in farms %}
-          <div class="bg-black/20 rounded-2xl p-5 border border-forest-500/20 hover:border-forest-500/50 transition-colors">
-            <h3 class="font-bold text-xl text-forest-300">{{ farm.farm_name }}</h3>
-            <div class="mt-4 space-y-2 text-sm text-gray-300">
-              <p><span class="opacity-60">Size:</span> {{ farm.size_acres }} Acres</p>
-              <p><span class="opacity-60">Location:</span> {{ farm.state }}</p>
-              <p><span class="opacity-60">Soil:</span> {{ farm.soil_type }}</p>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="text-center py-8 bg-black/20 rounded-2xl mb-8 border border-white/5">
-          <p class="text-gray-400">You haven't added any farm profiles yet.</p>
-        </div>
-        {% endif %}
-
-        <!-- Add New Farm Form -->
-        <h3 class="text-lg font-bold text-white mb-4 border-t border-white/10 pt-6">Add New Farm Profile</h3>
-        <form method="POST" action="">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-1">Farm Name</label>
-              <input type="text" name="farm_name" required placeholder="e.g. North Plot"
-                     class="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-forest-500 transition-colors">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-1">Size (Acres)</label>
-              <input type="number" step="0.1" name="size_acres" required placeholder="e.g. 5.5"
-                     class="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-forest-500 transition-colors">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-1">State</label>
-              <select name="state" required class="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-forest-500 transition-colors">
-                <option value="Punjab">Punjab</option>
-                <option value="Andhra Pradesh">Andhra Pradesh</option>
-                <option value="Tamil Nadu">Tamil Nadu</option>
-                <option value="Uttar Pradesh">Uttar Pradesh</option>
-                <option value="Madhya Pradesh">Madhya Pradesh</option>
-                <option value="Telangana">Telangana</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-1">Soil Type</label>
-              <select name="soil_type" required class="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-forest-500 transition-colors">
-                <option value="Alluvial">Alluvial</option>
-                <option value="Black Cotton">Black Cotton</option>
-                <option value="Red">Red</option>
-                <option value="Laterite">Laterite</option>
-                <option value="Sandy">Sandy</option>
-                <option value="Loamy">Loamy</option>
-                <option value="Clay">Clay</option>
-                <option value="Sandy Loam">Sandy Loam</option>
-                <option value="Silty">Silty</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" class="mt-4 px-6 py-2 bg-forest-600 hover:bg-forest-500 text-white rounded-lg font-bold transition-colors">
-            Save Farm Profile
-          </button>
-        </form>
+  <!-- ── Stats Row ── -->
+  <div class="dashboard-stats-grid">
+    <div class="dashboard-stat-card">
+      <div>
+        <p class="stat-label">Total Farmers</p>
+        <p class="stat-value">10,482</p>
       </div>
+      <div class="stat-icon">👥</div>
     </div>
 
-    <!-- Saved Plans Section -->
-    <div class="space-y-8">
-      <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-        <h2 class="text-2xl font-display font-bold text-white mb-6 flex items-center gap-2">
-          <span>📋</span> Saved Plans
-        </h2>
-        
+    <div class="dashboard-stat-card">
+      <div>
+        <p class="stat-label">Top Recommended</p>
+        <p class="stat-value green" style="font-size:20px;">🌿 Wheat</p>
+      </div>
+      <div class="stat-icon">🏆</div>
+    </div>
+
+    <div class="dashboard-stat-card">
+      <div>
+        <p class="stat-label">Your Saved Plans</p>
+        <p class="stat-value earth">{{ saved_plans|length }}</p>
+      </div>
+      <div class="stat-icon earth-icon">📋</div>
+    </div>
+
+    <div class="dashboard-stat-card">
+      <div>
+        <p class="stat-label">Avg Success Rate</p>
+        <p class="stat-value accent">94%</p>
+      </div>
+      <div class="stat-icon">📈</div>
+    </div>
+  </div>
+
+  <!-- ── Main Grid: Farm Profiles (left) + Sidebar (right) ── -->
+  <div class="dashboard-main-grid">
+
+    <!-- ── Farm Profiles Column ── -->
+    <div class="dashboard-card">
+      <h2 class="dashboard-card-title">🚜 My Farm Profiles</h2>
+
+      {% if farms %}
+      <div class="farm-profile-grid">
+        {% for farm in farms %}
+        <div class="farm-profile-tile">
+          <div class="farm-tile-name">{{ farm.farm_name }}</div>
+          <div class="farm-tile-meta">
+            <div class="farm-tile-row">
+              <span class="farm-tile-row-label">Size:</span>
+              <span>{{ farm.size_acres }} Acres</span>
+            </div>
+            <div class="farm-tile-row">
+              <span class="farm-tile-row-label">State:</span>
+              <span>{{ farm.state }}</span>
+            </div>
+            <div class="farm-tile-row">
+              <span class="farm-tile-row-label">Soil:</span>
+              <span>{{ farm.soil_type }}</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="farm-empty-state">
+        <p>You haven't added any farm profiles yet. Add one below ↓</p>
+      </div>
+      {% endif %}
+
+      <!-- Add New Farm Form -->
+      <hr class="add-farm-divider">
+      <p class="add-farm-heading">➕ Add New Farm Profile</p>
+      <form method="POST" action="">
+        <div class="dashboard-form-grid">
+          <div class="field-group">
+            <label class="field-label">Farm Name</label>
+            <input type="text" name="farm_name" required placeholder="e.g. North Plot"
+                   class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Size (Acres)</label>
+            <input type="number" step="0.1" name="size_acres" required placeholder="e.g. 5.5"
+                   class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">State</label>
+            <select name="state" required class="field-input">
+              <option value="Punjab">Punjab</option>
+              <option value="Andhra Pradesh">Andhra Pradesh</option>
+              <option value="Tamil Nadu">Tamil Nadu</option>
+              <option value="Uttar Pradesh">Uttar Pradesh</option>
+              <option value="Madhya Pradesh">Madhya Pradesh</option>
+              <option value="Telangana">Telangana</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Soil Type</label>
+            <select name="soil_type" required class="field-input">
+              <option value="Alluvial">Alluvial</option>
+              <option value="Black Cotton">Black Cotton</option>
+              <option value="Red">Red</option>
+              <option value="Laterite">Laterite</option>
+              <option value="Sandy">Sandy</option>
+              <option value="Loamy">Loamy</option>
+              <option value="Clay">Clay</option>
+              <option value="Sandy Loam">Sandy Loam</option>
+              <option value="Silty">Silty</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="dashboard-form-btn">💾 Save Farm Profile</button>
+      </form>
+    </div>
+
+    <!-- ── Right Sidebar ── -->
+    <div class="dashboard-sidebar">
+
+      <!-- Saved Plans -->
+      <div class="dashboard-card">
+        <h2 class="dashboard-card-title">📋 Saved Plans</h2>
         {% if saved_plans %}
-        <div class="space-y-4">
+        <div class="saved-plans-list">
           {% for plan in saved_plans %}
-          <div class="bg-black/20 rounded-xl p-4 border border-earth-500/20">
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="font-bold text-lg text-earth-300">{{ plan.crop_name }}</h3>
-                <p class="text-xs text-gray-500 mt-1">{{ plan.created_at.strftime('%Y-%m-%d') }}</p>
-              </div>
-              <div class="text-right">
-                <span class="inline-block px-2 py-1 rounded-full text-xs font-bold {{ 'bg-red-500/20 text-red-400' if plan.risk == 'High' else 'bg-yellow-500/20 text-yellow-400' if plan.risk == 'Medium' else 'bg-forest-500/20 text-forest-400' }}">
-                  {{ plan.risk }} Risk
-                </span>
-                <p class="text-xl font-display font-bold mt-1 text-white">{{ plan.score|int }}</p>
-              </div>
+          <div class="saved-plan-item">
+            <div>
+              <div class="plan-crop-name">{{ plan.crop_name }}</div>
+              <div class="plan-date">{{ plan.created_at.strftime('%d %b %Y') }}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="plan-score">{{ plan.score|int }}</div>
+              <span class="plan-risk-badge {{ plan.risk | lower if plan.risk else 'low' }}">
+                {{ plan.risk }} Risk
+              </span>
             </div>
           </div>
           {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-8 bg-black/20 rounded-2xl border border-white/5">
-          <p class="text-gray-400">No plans saved yet.</p>
-          <a href="/planner" class="inline-block mt-4 text-forest-400 hover:text-forest-300 underline">Generate a Plan</a>
+        <div class="plans-empty-state">
+          <p>No plans saved yet. Generate one to get started.</p>
+          <a href="/planner">🌱 Go to Planner</a>
         </div>
         {% endif %}
       </div>
 
-      <!-- Climate Alerts Widget -->
-      <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-        <h2 class="text-xl font-display font-bold text-white mb-6 flex items-center gap-2">
-          <span>🔔</span> Climate Alerts
-        </h2>
-        <div class="space-y-4">
-          <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex gap-3">
-            <div class="text-red-400 mt-0.5">🔥</div>
+      <!-- Climate Alerts -->
+      <div class="dashboard-card">
+        <h2 class="dashboard-card-title">🔔 Climate Alerts</h2>
+        <div class="alerts-list">
+          <div class="alert-item alert-danger">
+            <div class="alert-icon">🔥</div>
             <div>
-              <p class="text-sm font-bold text-red-200">Heatwave Warning</p>
-              <p class="text-xs text-red-300/80 mt-1">Temperatures expected to exceed 40°C in Madhya Pradesh across the next 3 days.</p>
+              <p class="alert-title">Heatwave Warning</p>
+              <p class="alert-desc">Temperatures expected to exceed 40°C in Madhya Pradesh over the next 3 days.</p>
             </div>
           </div>
-          <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex gap-3">
-            <div class="text-yellow-400 mt-0.5">🌧️</div>
+          <div class="alert-item alert-warning">
+            <div class="alert-icon">🌧️</div>
             <div>
-              <p class="text-sm font-bold text-yellow-200">Heavy Rain Alert</p>
-              <p class="text-xs text-yellow-300/80 mt-1">Unseasonal rainfall expected in Punjab. Halt wheat harvesting.</p>
+              <p class="alert-title">Heavy Rain Alert</p>
+              <p class="alert-desc">Unseasonal rainfall expected in Punjab. Consider halting wheat harvesting.</p>
+            </div>
+          </div>
+          <div class="alert-item alert-info">
+            <div class="alert-icon">🌤️</div>
+            <div>
+              <p class="alert-title">Favorable Conditions</p>
+              <p class="alert-desc">Good planting window in Andhra Pradesh for Kharif season crops.</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Recent Feedback Widget -->
-      <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-        <h2 class="text-xl font-display font-bold text-white mb-6 flex items-center gap-2">
-          <span>💬</span> Recent Community Feedback
-        </h2>
-        <div class="space-y-4">
-          <div class="bg-black/20 border border-white/5 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-bold text-forest-300">Ramesh Kumar</span>
-              <span class="text-xs text-yellow-400">★★★★★</span>
+      <!-- Community Feedback -->
+      <div class="dashboard-card">
+        <h2 class="dashboard-card-title">💬 Community Feedback</h2>
+        <div class="community-list">
+          <div class="community-item">
+            <div class="community-item-top">
+              <span class="community-name">Ramesh Kumar</span>
+              <span class="community-stars">★★★★★</span>
             </div>
-            <p class="text-xs text-gray-400 line-clamp-2">"The crop recommendation helped me choose wheat this season. The weather alerts were spot on and saved my field from unexpected frost."</p>
+            <p class="community-text">"The crop recommendation helped me choose wheat this season. The weather alerts were spot on."</p>
           </div>
-          <div class="bg-black/20 border border-white/5 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-bold text-forest-300">Priya Devi</span>
-              <span class="text-xs text-yellow-400">★★★★☆</span>
+          <div class="community-item">
+            <div class="community-item-top">
+              <span class="community-name">Priya Devi</span>
+              <span class="community-stars">★★★★☆</span>
             </div>
-            <p class="text-xs text-gray-400 line-clamp-2">"I tried the sugarcane recommendation and got a great yield this year. Very accurate tool."</p>
+            <p class="community-text">"I tried the sugarcane recommendation and got a great yield this year. Very accurate tool."</p>
           </div>
-          <a href="/feedback" class="block text-center text-xs text-forest-400 hover:text-forest-300 mt-4 underline">View All Feedback</a>
         </div>
+        <a href="/feedback" class="community-link">View All Feedback →</a>
       </div>
+
     </div>
-    
   </div>
+
 </div>
 {% endblock %}

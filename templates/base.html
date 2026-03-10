@@ -71,8 +71,8 @@
       </a>
       
       <!-- Center: Main navigation -->
-      <div class="nav-links space-x-2">
-        <a href="/" class="nav-link">🏠 Home</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link" data-i18n="home">🏠 Home</a>
         
         <div class="relative group h-full flex items-center py-5">
           <button class="nav-link cursor-pointer bg-transparent border-none">
@@ -80,28 +80,27 @@
             <svg class="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
           </button>
           
-          <div class="absolute top-[60px] left-1/2 -translate-x-1/2 mt-0 w-48 bg-[#0a130d]/95 backdrop-blur-xl border border-forest-500/20 rounded-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 shadow-2xl border-t-2 border-t-forest-500 z-50">
-            <a href="/planner" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors">📝 Planner</a>
-            <a href="/doctor" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors">🌿 Plant Doctor</a>
-            <a href="/insights" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors">💡 Insights</a>
-            <a href="/results" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors">📊 Results</a>
-            <a href="/calculator" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors">🧮 Calculator</a>
+          <div class="absolute top-[60px] left-1/2 -translate-x-1/2 mt-0 min-w-[220px] w-max max-w-[320px] bg-[#0a130d]/95 backdrop-blur-xl border border-forest-500/20 rounded-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 shadow-2xl border-t-2 border-t-forest-500 z-50">
+            <a href="/planner" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors" data-i18n="planner">📝 Planner</a>
+            <a href="/doctor" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors" data-i18n="doctor">🌿 Plant Doctor</a>
+            <a href="/insights" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors" data-i18n="insights">💡 Insights</a>
+            <a href="/results" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors" data-i18n="results">📊 Results</a>
+            <a href="/calculator" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-forest-500/20 transition-colors" data-i18n="calculator">🧮 Calculator</a>
           </div>
         </div>
 
-        <a href="/feedback" class="nav-link">💬 Feedback</a>
-        <a href="/doctor" class="nav-link">🌿 Plant Doctor</a>
+        <a href="/feedback" class="nav-link" data-i18n="feedback">💬 Feedback</a>
+        {% if current_user.is_authenticated %}
+        <a href="/dashboard" class="nav-link nav-link--dashboard" data-i18n="dashboard">📊 Dashboard</a>
+        {% endif %}
       </div>
 
       <!-- Right side: Actions -->
       <div class="nav-actions">
-        {% if current_user.is_authenticated %}
-        <a href="/dashboard" class="nav-link">🏢 Dashboard</a>
-        {% endif %}
 
         <div class="nav-controls">
           <div class="nav-link cursor-pointer">
-            🌐 EN
+            🌐 <span id="currentLangDisplay">EN</span>
           </div>
           <button id="themeToggle" class="theme-btn-minimal" aria-label="Toggle dark mode">
             <span class="sun-icon">☀️</span>
@@ -111,10 +110,10 @@
         
         <div class="nav-auth">
           {% if current_user.is_authenticated %}
-          <a href="/logout" class="nav-link text-red-500">🚪 Logout</a>
+          <a href="/logout" class="nav-link text-red-500" data-i18n="logout">🚪 Logout</a>
           {% else %}
-          <a href="/login" class="nav-link">🔑 Login</a>
-          <a href="/register" class="nav-link">✨ Sign Up</a>
+          <a href="/login" class="nav-link" data-i18n="login">🔑 Login</a>
+          <a href="/register" class="nav-link" data-i18n="signup">✨ Sign Up</a>
           {% endif %}
         </div>
 
@@ -137,39 +136,46 @@
       <button class="mobile-menu-close" onclick="closeMobileMenu()" aria-label="Close menu">✕</button>
     </div>
     <nav class="mobile-nav-links">
-      <a href="/" class="mobile-nav-link" onclick="closeMobileMenu()">🏠 Home</a>
+      <a href="/" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="home">🏠 Home</a>
       <div class="px-4 py-2 mt-2 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Features</div>
-      <a href="/planner" class="mobile-nav-link" onclick="closeMobileMenu()">📝 Planner</a>
-      <a href="/doctor" class="mobile-nav-link" onclick="closeMobileMenu()">🌿 Plant Doctor</a>
-      <a href="/insights" class="mobile-nav-link" onclick="closeMobileMenu()">💡 Insights</a>
-      <a href="/results" class="mobile-nav-link" onclick="closeMobileMenu()">📊 Results</a>
-      <a href="/calculator" class="mobile-nav-link" onclick="closeMobileMenu()">🧮 Calculator</a>
+      <a href="/planner" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="planner">📝 Planner</a>
+      <a href="/doctor" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="doctor">🌿 Plant Doctor</a>
+      <a href="/insights" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="insights">💡 Insights</a>
+      <a href="/results" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="results">📊 Results</a>
+      <a href="/calculator" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="calculator">🧮 Calculator</a>
       <div class="px-4 py-2 mt-2 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Other</div>
-      <a href="/feedback" class="mobile-nav-link" onclick="closeMobileMenu()">💬 Feedback</a>
+      <a href="/feedback" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="feedback">💬 Feedback</a>
       {% if current_user.is_authenticated %}
-      <a href="/dashboard" class="mobile-nav-link" onclick="closeMobileMenu()">🏢 Dashboard</a>
-      <a href="/logout" class="mobile-nav-btn mt-4 text-center border border-red-500/50 text-red-500 hover:bg-red-500/10" onclick="closeMobileMenu()">🚪 Logout</a>
+      <a href="/dashboard" class="mobile-nav-link" onclick="closeMobileMenu()" data-i18n="dashboard">🏢 Dashboard</a>
+      <a href="/logout" class="mobile-nav-btn mt-4 text-center border border-red-500/50 text-red-500 hover:bg-red-500/10" onclick="closeMobileMenu()" data-i18n="logout">🚪 Logout</a>
       {% else %}
-      <a href="/login" class="mobile-nav-btn mt-4 text-center border border-forest-500" onclick="closeMobileMenu()">🔑 Login</a>
-      <a href="/register" class="mobile-nav-btn mt-2 text-center bg-forest-500 text-white" onclick="closeMobileMenu()">🚀 Sign Up</a>
+      <a href="/login" class="mobile-nav-btn mt-4 text-center border border-forest-500" onclick="closeMobileMenu()" data-i18n="login">🔑 Login</a>
+      <a href="/register" class="mobile-nav-btn mt-2 text-center bg-forest-500 text-white" onclick="closeMobileMenu()" data-i18n="signup">🚀 Sign Up</a>
       {% endif %}
       <div class="mt-4 flex align-center justify-between px-2">
-        <select class="nav-lang bg-transparent border border-forest-500 rounded p-1 text-sm text-forest-100" aria-label="Select Language">
-          <option value="en">🌐 EN</option>
-          <option value="hi">🌐 HI</option>
+        <select class="nav-lang bg-[#0a130d] border border-forest-500 rounded p-1 text-sm text-forest-100" aria-label="Select Language">
+          <option value="en">🌐 English</option>
+          <option value="hi">🌐 Hindi (हिन्दी)</option>
+          <option value="te">🌐 Telugu (తెలుగు)</option>
+          <option value="ta">🌐 Tamil (தமிழ்)</option>
+          <option value="pa">🌐 Punjabi (ਪੰਜਾਬੀ)</option>
         </select>
       </div>
+
     </nav>
   </div>
 
   <main>
-    <div class="max-w-7xl mx-auto px-4 mt-6">
+    <div class="max-w-7xl mx-auto px-4 pt-24">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
-            <div class="mb-4 rounded-xl flex items-center justify-between p-4 {{ 'bg-red-500/10 border border-red-500/30 text-red-400' if category == 'danger' else 'bg-forest-500/10 border border-forest-500/30 text-forest-400' }}">
-              <span>{{ message }}</span>
-              <button onclick="this.parentElement.style.display='none'" class="text-xl leading-none opacity-70 hover:opacity-100 transition-opacity">&times;</button>
+            <div class="mb-4 rounded-xl flex items-center justify-between p-4 {{ 'bg-red-500/20 border border-red-500/50 text-red-300' if category == 'danger' else 'bg-forest-500/20 border border-forest-500/50 text-forest-300' }}">
+              <div class="flex items-center gap-3">
+                <span class="text-xl">{{ '❌' if category == 'danger' else '✅' }}</span>
+                <span class="font-medium">{{ message }}</span>
+              </div>
+              <button onclick="this.parentElement.style.display='none'" class="text-xl leading-none opacity-70 hover:opacity-100 transition-opacity">×</button>
             </div>
           {% endfor %}
         {% endif %}

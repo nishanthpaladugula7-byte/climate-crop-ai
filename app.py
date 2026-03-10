@@ -17,7 +17,12 @@ from models import db, User, FarmProfile, SavedPlan  # type: ignore
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "default_dev_secret_key")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
+
+# Database Configuration (supports Render's PostgreSQL)
+uri = os.environ.get("DATABASE_URL", "sqlite:///site.db")
+if uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = uri
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # Initialize extensions
@@ -588,9 +593,6 @@ def calculator():
         return render_template("calculator.html", result=result, crop=crop, acres=acres)
 
     return render_template("calculator.html")
-
-
-feedback_list: List[Dict[str, Any]] = []  # In-memory storage for feedback
 
 
 @app.route("/feedback", methods=["GET", "POST"])

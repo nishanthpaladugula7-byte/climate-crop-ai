@@ -5,6 +5,83 @@ let currentResults = null;
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// ── Translations ───────────────────────────────────────────────────
+const TRANSLATIONS = {
+  hi: { // Hindi (UP, MP)
+    home: "घर", planner: "योजनाकार", doctor: "पादप डॉक्टर", insights: "सुझाव", 
+    results: "परिणाम", calculator: "कैलकुलेटर", feedback: "प्रतिक्रिया", 
+    dashboard: "डैशबोर्ड", login: "लॉगिन", signup: "साइन अप",
+    field_profile: "खेत प्रोफ़ाइल", step_01: "चरण 01",
+    recommendations: "एआई सिफारिशें", step_02: "चरण 02",
+    growth_smart: "स्मार्ट खेती के लिए सब कुछ",
+    map_desc: "क्षेत्रीय जलवायु डेटा भरने के लिए अपने राज्य का चयन करें"
+  },
+  te: { // Telugu (AP, Telangana)
+    home: "హోమ్", planner: "ప్లానర్", doctor: "ప్లాంట్ డాక్టర్", insights: "అంశాలు", 
+    results: "ఫలితాలు", calculator: "కాలిక్యులేటర్", feedback: "ఫీడ్‌బ్యాక్", 
+    dashboard: "డ్యాష్‌బోర్డ్", login: "లాగిన్", signup: "సైన్ అప్",
+    field_profile: "ఫీల్డ్ ప్రొఫైల్", step_01: "దశ 01",
+    recommendations: "AI సిఫార్సులు", step_02: "దశ 02",
+    growth_smart: "స్మార్ట్‌గా ఎదగడానికి మీకు కావలసినవన్నీ",
+    map_desc: "ప్రాంతీయ వాతావరణ డేటాను పూరించడానికి మీ రాష్ట్రాన్ని ఎంచుకోండి"
+  },
+  ta: { // Tamil (Tamil Nadu)
+    home: "முகப்பு", planner: "திட்டமிடுபவர்", doctor: "தாவர மருத்துவர்", insights: "நுண்ணறிவு", 
+    results: "முடிவுகள்", calculator: "கால்குலேட்டர்", feedback: "கருத்து", 
+    dashboard: "டாஷ்போர்டு", login: "உள்நுழை", signup: "பதிவு செய்க",
+    field_profile: "புல சுயவிவரம்", step_01: "படி 01",
+    recommendations: "AI பரிந்துரைகள்", step_02: "படி 02",
+    growth_smart: "புத்திசாலித்தனமாக வளர உங்களுக்கு தேவையான அனைத்தும்",
+    map_desc: "பிராந்திய காலநிலை தரவை நிரப்ப உங்கள் மாநிலத்தைத் தேர்ந்தெடுக்கவும்"
+  },
+  pa: { // Punjabi (Punjab)
+    home: "ਮੁੱਖ ਪੰਨਾ", planner: "ਯੋਜਨਾਕਾਰ", doctor: "ਪੌਦਾ ਡਾਕਟਰ", insights: "ਸੂਝ", 
+    results: "ਨਤੀਜੇ", calculator: "ਕੈਲਕੁਲੇਟਰ", feedback: "ਫੀਡਬੈਕ", 
+    dashboard: "ਡੈਸ਼ਬੋਰਡ", login: "ਲੌਗਇਨ", signup: "ਸਾਈਨ ਅੱਪ",
+    field_profile: "ਖੇਤ ਪ੍ਰੋਫਾਈਲ", step_01: "ਕਦਮ 01",
+    recommendations: "AI ਸਿਫ਼ਾਰਸ਼ਾਂ", step_02: "ਕਦਮ 02",
+    growth_smart: "ਸਮਾਰਟ ਵਧਣ ਲਈ ਤੁਹਾਨੂੰ ਸਭ ਕੁਝ ਚਾਹੀਦਾ ਹੈ",
+    map_desc: "ਖੇਤਰੀ ਜਲਵਾਯੂ ਡੇਟਾ ਭਰਨ ਲਈ ਆਪਣੇ ਰਾਜ ਦੀ ਚੋਣ ਕਰੋ"
+  }
+};
+
+const STATE_LANG_MAP = {
+  "Andhra Pradesh": "te", "Telangana": "te",
+  "Tamil Nadu": "ta",
+  "Uttar Pradesh": "hi", "Madhya Pradesh": "hi",
+  "Punjab": "pa"
+};
+
+let currentLang = localStorage.getItem('lang') || 'en';
+
+function updateLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const originalText = el.getAttribute('data-original') || el.textContent.split('\n')[0].trim();
+    
+    // Store original if not already stored
+    if (!el.hasAttribute('data-original')) {
+      el.setAttribute('data-original', originalText);
+    }
+
+    if (lang === 'en' || !TRANSLATIONS[lang] || !TRANSLATIONS[lang][key]) {
+      el.textContent = originalText;
+    } else {
+      const translation = TRANSLATIONS[lang][key];
+      // Keep English, add local language as subtitle/small text
+      el.innerHTML = `${originalText} <span class="local-lang-label">(${translation})</span>`;
+    }
+  });
+
+  // Update navbar language display
+  const langDisplay = document.getElementById('currentLangDisplay');
+  if (langDisplay) langDisplay.textContent = lang.toUpperCase();
+}
+
 // ── Theme ──────────────────────────────────────────────────────────
 const themeToggle = document.getElementById('themeToggle');
 let isDark = localStorage.getItem('theme') === 'light' ? false : true;
@@ -673,10 +750,11 @@ async function fetchLocations() {
 window.addEventListener('DOMContentLoaded', () => {
   const path = window.location.pathname;
 
-  // Initialize theme
-  updateTheme();
+    // Initialize theme and language
+    updateTheme();
+    updateLanguage(currentLang);
 
-  // Highlight active nav link
+    // Highlight active nav link
   document.querySelectorAll('.nav-link').forEach(link => {
     if (link.getAttribute('href') === path) {
       link.classList.add('active');
@@ -812,7 +890,13 @@ function selectState(state) {
   if (select) {
     select.value = state;
     select.dispatchEvent(new Event('change'));
-    showToast(`Loaded climate data for ${state}`, "success");
+    
+    // Auto-switch language based on state
+    if (STATE_LANG_MAP[state]) {
+      updateLanguage(STATE_LANG_MAP[state]);
+    }
+
+    showToast(`Loaded climate data and language for ${state}`, "success");
     select.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
@@ -1092,4 +1176,13 @@ document.addEventListener('DOMContentLoaded', () => {
       link.style.color = 'var(--accent)';
     }
   });
+});
+
+// Language switcher in mobile menu
+document.addEventListener('DOMContentLoaded', () => {
+  const langSel = document.querySelector('.nav-lang');
+  if (langSel) {
+    langSel.value = currentLang;
+    langSel.addEventListener('change', (e) => updateLanguage(e.target.value));
+  }
 });
