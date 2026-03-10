@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: climate-crop-planner
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: climate-crop-db
+          property: connectionString
+
+databases:
+  - name: climate-crop-db
+    plan: free
