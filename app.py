@@ -14,6 +14,8 @@ from flask_login import (  # type: ignore
 )
 from flask_bcrypt import Bcrypt  # type: ignore
 from models import db, User, FarmProfile, SavedPlan  # type: ignore
+import json
+from datetime import datetime
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "default_dev_secret_key")
@@ -358,6 +360,90 @@ CROP_DATABASE: Dict[str, Dict[str, Any]] = {
         ],
         "rotation": "Maize or Pearl Millet",
     },
+    "Potato": {
+        "icon": "🥔",
+        "color": "#D7B56D",
+        "optimal_rainfall": (500, 800),
+        "optimal_temp": (15, 25),
+        "soils": ["Sandy Loam", "Loamy"],
+        "seasons": ["Rabi"],
+        "water_need": "Medium",
+        "growth_days": 90,
+        "description": "Major tuber crop grown widely in Uttar Pradesh and Punjab.",
+        "market_value": "₹12-20/kg",
+        "protein": "2g/100g",
+        "irrigation": "Regular watering every 7–10 days.",
+        "economics": {
+            "yield_per_acre": "10.0 tons",
+            "price": "₹15/kg",
+            "profit": "₹1,00,000/acre",
+        },
+        "calendar": ["Sowing (Oct)", "Growth (Nov-Jan)", "Harvest (Feb)"],
+        "rotation": "Maize or Pulses",
+    },
+    "Turmeric": {
+        "icon": "🫚",
+        "color": "#FFC107",
+        "optimal_rainfall": (1500, 2500),
+        "optimal_temp": (20, 30),
+        "soils": ["Loamy", "Silty Loam", "Clay Loam"],
+        "seasons": ["Kharif"],
+        "water_need": "High",
+        "growth_days": 240,
+        "description": "Important spice crop, highly popular in Telangana.",
+        "market_value": "₹80-120/kg",
+        "protein": "7.8g/100g",
+        "irrigation": "Frequent irrigation; 1500–2500 mm total.",
+        "economics": {
+            "yield_per_acre": "2.0 tons",
+            "price": "₹100/kg",
+            "profit": "₹1,50,000/acre",
+        },
+        "calendar": ["Planting (Jun)", "Growth (Aug-Dec)", "Harvest (Feb)"],
+        "rotation": "Maize or Vegetables",
+    },
+    "Chillies": {
+        "icon": "🌶️",
+        "color": "#F44336",
+        "optimal_rainfall": (600, 1200),
+        "optimal_temp": (20, 30),
+        "soils": ["Loamy", "Clay Loam"],
+        "seasons": ["Kharif", "Rabi"],
+        "water_need": "Medium",
+        "growth_days": 150,
+        "description": "High-value spice crop with strong demand in Andhra Pradesh.",
+        "market_value": "₹150-250/kg",
+        "protein": "2g/100g",
+        "irrigation": "Water every 5–7 days; 600–1000 mm total.",
+        "economics": {
+            "yield_per_acre": "1.5 tons",
+            "price": "₹200/kg",
+            "profit": "₹2,00,000/acre",
+        },
+        "calendar": ["Sowing (Jun/Oct)", "Growth (Aug/Dec)", "Harvest (Oct/Feb)"],
+        "rotation": "Legumes",
+    },
+    "Pulses": {
+        "icon": "🫛",
+        "color": "#4CAF50",
+        "optimal_rainfall": (400, 700),
+        "optimal_temp": (20, 30),
+        "soils": ["Loamy", "Sandy Loam"],
+        "seasons": ["Rabi", "Kharif"],
+        "water_need": "Low",
+        "growth_days": 120,
+        "description": "Essential protein sources like Moong, Urad, and Pigeon Pea.",
+        "market_value": "₹60-90/kg",
+        "protein": "22g/100g",
+        "irrigation": "Minimal watering needed.",
+        "economics": {
+            "yield_per_acre": "0.6 tons",
+            "price": "₹80/kg",
+            "profit": "₹40,000/acre",
+        },
+        "calendar": ["Sowing (Jun/Oct)", "Harvest (Oct/Feb)"],
+        "rotation": "Cereals",
+    },
 }
 
 WEATHER_HISTORY: Dict[str, Dict[str, List[float]]] = {
@@ -401,40 +487,99 @@ DEFAULT_WEATHER: Dict[str, List[float]] = {
     "avg_temp": [20, 22, 27, 32, 36, 35, 30, 29, 28, 25, 20, 18],
 }
 
+# Load state crop popularity data
+try:
+    with open("crop_data.json", "r") as f:
+        STATE_CROP_DATA = json.load(f)
+except FileNotFoundError:
+    STATE_CROP_DATA = {}
+
+
+def detect_season() -> str:
+    month = datetime.now().month
+    # Kharif: June to October
+    # Rabi: November to March
+    # Summer/Zaid: April to May (simplified)
+    if 6 <= month <= 10:
+        return "Kharif"
+    elif month >= 11 or month <= 3:
+        return "Rabi"
+    else:
+        return "Summer"
+
 
 def calculate_crop_score(
-    crop_data: Dict[str, Any], user_data: Dict[str, Any]
+    crop_name: str, crop_data: Dict[str, Any], user_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     # Scale monthly rainfall to annual for comparison with database ranges
     rainfall = float(user_data["rainfall"]) * 12
     temp = float(user_data["temperature"])
     soil = user_data["soil_type"]
     season = user_data["season"]
+    location = user_data.get("location", "Punjab")
 
     r_min, r_max = crop_data["optimal_rainfall"]
     t_min, t_max = crop_data["optimal_temp"]
 
-    # Rainfall score (0.0-40.0)
+    # 1. State Crop Popularity (40%)
+    state_info = STATE_CROP_DATA.get(location, {})
+    dominant_crops = state_info.get("dominant_crops", [])
+    
+    # Strictly filter based on dominant crops if the list exists for the state
+    if dominant_crops and crop_name not in dominant_crops:
+        return None # Indicate this crop should be filtered out
+
+    popularity_map = state_info.get("popularity", {})
+    pop_score_raw = popularity_map.get(crop_name, 0.1)  # Base 0.1 if not listed
+    pop_score = pop_score_raw * 40.0
+
+    # 2. Climate Suitability (30%) - Split between Rainfall (15%) and Temp (15%)
     r_center = (r_min + r_max) / 2.0
     r_range = (r_max - r_min) / 2.0
     if r_range == 0:
         r_range = 1.0
-    r_score = max(0.0, 40.0 * (1.0 - abs(rainfall - r_center) / (r_range * 1.8)))
+    # Higher penalty for climate mismatch
+    r_match_raw = max(0.0, (1.0 - abs(rainfall - r_center) / (r_range * 1.5)))
+    r_score = r_match_raw * 15.0
 
-    # Temperature score (0.0-35.0)
     t_center = (t_min + t_max) / 2.0
     t_range = (t_max - t_min) / 2.0
     if t_range == 0:
         t_range = 1.0
-    t_score = max(0.0, 35.0 * (1.0 - abs(temp - t_center) / (t_range * 1.8)))
+    t_match_raw = max(0.0, (1.0 - abs(temp - t_center) / (t_range * 1.5)))
+    t_score = t_match_raw * 15.0
+    climate_score = r_score + t_score
 
-    # Soil compatibility (0.0-15.0)
-    s_score = 15.0 if soil in crop_data["soils"] else 4.0
+    # 3. Soil Compatibility (20%)
+    soil_match_raw = 1.0 if soil in crop_data["soils"] else 0.2
+    s_score = soil_match_raw * 20.0
 
-    # Season compatibility (0.0-10.0)
-    season_score = 10.0 if season in crop_data["seasons"] else 2.0
+    # 4. Market Value (10%)
+    # Mock market value influence based on growth_days and profit data if available
+    market_score_raw = 0.8  # Default
+    if "economics" in crop_data:
+        try:
+            profit_str = crop_data["economics"].get("profit", "₹0").replace("₹", "").replace(",", "").split("/")[0]
+            profit_val = float(profit_str)
+            market_score_raw = min(1.0, profit_val / 150000.0) # Normalize against 1.5L profit
+        except Exception:
+            pass
+    m_score = market_score_raw * 10.0
 
-    total = r_score + t_score + s_score + season_score
+    # Seasonality Filter (Internal adjust but not part of the 4 weighted categories)
+    # Suggestions: reduce core if season mismatch
+    season_multiplier = 1.0 if season in crop_data["seasons"] else 0.5
+    
+    total = (pop_score + climate_score + s_score + m_score) * season_multiplier
+
+    # Dominant crop boost: for any state, the top-2 popularity crops
+    # get a boost when their season matches, to ensure they always appear
+    # at the top regardless of climate variations (since farmers use irrigation)
+    if dominant_crops and season in crop_data["seasons"]:
+        sorted_pops = sorted(popularity_map.items(), key=lambda x: x[1], reverse=True)
+        top_crop_names = [name for name, _ in sorted_pops[:2]]
+        if crop_name in top_crop_names:
+            total += 15.0  # Strong boost for the state's #1 and #2 crops
 
     # Risk calculation
     deviation = abs(rainfall - r_center) / max(r_center, 1.0) + abs(
@@ -448,16 +593,18 @@ def calculate_crop_score(
         risk = "High"
 
     # Yield stability (0-100)
-    yield_stability = min(100, int(total * 1.05))
+    yield_stability = min(100, int((r_match_raw * 0.4 + t_match_raw * 0.4 + soil_match_raw * 0.2) * 100))
 
     return {
         "score": round(float(total), 2),
         "risk": risk,
         "yield_stability": yield_stability,
-        "rainfall_match": round(float(r_score) / 40.0 * 100.0),
-        "temp_match": round(float(t_score) / 35.0 * 100.0),
-        "soil_match": round(float(s_score) / 15.0 * 100.0),
-        "season_match": round(float(season_score) / 10.0 * 100.0),
+        "rainfall_match": round(float(r_match_raw) * 100.0),
+        "temp_match": round(float(t_match_raw) * 100.0),
+        "soil_match": round(float(soil_match_raw) * 100.0),
+        "season_match": round(100.0 if season in crop_data["seasons"] else 20.0),
+        "market_score": round(float(m_score) * 10.0), # For UI if needed
+        "popularity_score": round(float(pop_score) * 2.5), # Scale to 100 for match bars
     }
 
 
@@ -799,7 +946,9 @@ def predict():
         scored_crops: List[Dict[str, Any]] = []
 
         for crop_name, crop_data in CROP_DATABASE.items():
-            result = calculate_crop_score(crop_data, data)
+            result = calculate_crop_score(crop_name, crop_data, data)
+            if result is None:
+                continue
             scored_crops.append(
                 {
                     "name": crop_name,
